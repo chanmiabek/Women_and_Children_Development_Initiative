@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-orange: #f97316;
+  --primary-orange-dark: #ea580c;
+  --primary-purple: #764ba2;
+  --primary-blue: #667eea;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: #f9fafb;
+  font-family: Inter, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-orange);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-orange-dark);
+}
+
+.gradient-hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-footer {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
+.navbar-scrolled {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.nav-link {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.nav-link::after {
+  background: var(--primary-orange);
+  bottom: -5px;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  transition: width 0.3s ease;
+  width: 0;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 100%;
+}
+
+.hover-lift {
+  transition: all 0.3s ease;
+}
+
+.hover-lift:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+}
+
+.metric-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.12);
+  transform: translateY(-3px);
+}
+
+.progress-bar {
+  transition: width 1s ease-in-out;
+}
+
+.aos-lite {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.aos-enabled .aos-lite {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.aos-enabled .aos-lite.aos-animate {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.modal-panel {
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
