@@ -1,11 +1,11 @@
 import React from 'react';
 import { Layout } from './components/Layout.jsx';
-import { DonationSection, Newsletter } from './components/sections.jsx';
-import { PageHero } from './components/ui.jsx';
+import { Newsletter } from './components/sections.jsx';
 import { useReveal } from './hooks/useReveal.js';
 import { useRoute } from './hooks/useRoute.js';
 import { ContactPage } from './pages/ContactPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
+import { DonationPage } from './pages/Donation.jsx';
 import { FaqPage } from './pages/FaqPage.jsx';
 import { GenericPage } from './pages/GenericPage.jsx';
 import { HomePage } from './pages/HomePage.jsx';
@@ -27,12 +27,7 @@ export default function App() {
   } else if (route === '/volunteer') {
     content = <VolunteerPage />;
   } else if (route === '/donate') {
-    content = (
-      <>
-        <PageHero title="Donate" text="Make a secure demo donation and generate a receipt." icon="fa-heart" />
-        <DonationSection />
-      </>
-    );
+    content = <DonationPage />;
   } else if (route === '/faq') {
     content = <FaqPage />;
   } else {

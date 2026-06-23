@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
-import { events, featuredImages, galleryImages, posts, programs } from '../data/siteData.js';
+import { featuredImages, galleryImages } from '../data/siteData.js';
+import { PaystackButton } from './PaystackButton.jsx';
+import { submitDonation, submitNewsletter } from '../services/api.js';
+import { useCmsContent } from '../hooks/useCmsContent.js';
+import { usePaymentConfig } from '../hooks/usePayment.js';
 import { readJson, saveSubscriber, saveSubmission, writeJson } from '../utils/storage.js';
 import { Counter, Icon, Input, LinkButton, Modal, SectionTitle } from './ui.jsx';
 
 export function Hero({ navigate }) {
+  const cms = useCmsContent();
+  const page = cms.pages.home;
+  const titleParts = page.title.split(',');
   return (
-    <section id="home" className="gradient-hero overflow-hidden py-24 text-white">
-      <div className="container mx-auto px-6">
-        <div className="flex flex-col items-center justify-between lg:flex-row">
-          <div className="aos-lite mb-12 lg:mb-0 lg:w-1/2">
-            <h1 className="mb-6 text-4xl font-bold leading-tight lg:text-6xl">Empowering Voices,<br /><span className="text-yellow-300">Transforming Lives</span></h1>
-            <p className="mb-8 text-lg leading-relaxed opacity-95 lg:text-xl">Join us in creating lasting change for women and children through education, healthcare, and economic empowerment programs worldwide.</p>
+    <section id="home" className="home-hero-bg relative overflow-hidden py-24 text-white" style={{ backgroundImage: `url("${page.backgroundImage || featuredImages.hero}")` }}>
+      <div className="absolute inset-0 bg-gray-950/65" />
+      <div className="relative z-10 container mx-auto px-6">
+        <div className="flex min-h-[28rem] items-center">
+          <div className="aos-lite max-w-3xl">
+            <p className="mb-3 font-semibold uppercase tracking-wide text-yellow-300">{page.eyebrow}</p>
+            <h1 className="mb-6 text-4xl font-bold leading-tight lg:text-6xl">{titleParts[0]}{titleParts[1] && <><br /><span className="text-yellow-300">{titleParts.slice(1).join(',').trim()}</span></>}</h1>
+            <p className="mb-8 text-lg leading-relaxed opacity-95 lg:text-xl">{page.text}</p>
             <div className="flex flex-col gap-4 sm:flex-row">
               <LinkButton href="/donate" navigate={navigate} className="rounded-full bg-white px-8 py-3 text-center font-semibold text-orange-600 transition-all hover:scale-105 hover:bg-gray-100">
                 <Icon name="fa-heart" className="mr-2" />Support Our Mission
@@ -25,18 +34,6 @@ export function Hero({ navigate }) {
                 <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-800 bg-orange-600"><span className="text-sm font-bold text-white">2k+</span></div>
               </div>
               <p className="text-sm">Join <span className="font-bold">2,000+</span> supporters making a difference</p>
-            </div>
-          </div>
-          <div className="aos-lite lg:w-1/2">
-            <div className="relative">
-              <div className="absolute -left-4 -top-4 h-full w-full rounded-2xl border-2 border-white/30" />
-              <div className="relative z-10 overflow-hidden rounded-2xl bg-white/10 shadow-2xl ring-1 ring-white/20">
-                <img src={featuredImages.hero} alt="WCDI community outreach gathering" className="h-[26rem] w-full object-cover" />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-gray-950/75 to-transparent p-6">
-                  <p className="text-2xl font-bold">Women & Children</p>
-                  <p className="mt-2 text-white/90">Development Initiative in action</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -70,18 +67,20 @@ export function Stats() {
 }
 
 export function AboutSection() {
+  const cms = useCmsContent();
+  const about = cms.about;
   return (
     <section id="about" className="bg-gray-50 py-20">
-      <SectionTitle eyebrow="About Us" title="Making a Difference Since 2010" text="We are a non-profit organization dedicated to empowering women and children through sustainable development programs." />
+      <SectionTitle eyebrow={cms.pages.about.eyebrow} title={about.sectionTitle} text={about.sectionText} />
       <div className="container mx-auto grid items-center gap-12 px-6 lg:grid-cols-2">
         <div className="aos-lite overflow-hidden rounded-2xl bg-white shadow-xl">
           <img src={featuredImages.about} alt="WCDI founder speaking during a community event" className="h-[28rem] w-full object-cover object-top" />
         </div>
         <div className="aos-lite">
-          <h3 className="mb-4 text-2xl font-bold text-gray-800">Our Mission & Vision</h3>
-          <p className="mb-6 leading-relaxed text-gray-600">To create a world where every woman and child has access to quality education, healthcare, and economic opportunities, enabling them to reach their full potential and break the cycle of poverty.</p>
+          <h3 className="mb-4 text-2xl font-bold text-gray-800">{about.missionTitle}</h3>
+          <p className="mb-6 leading-relaxed text-gray-600">{about.missionText}</p>
           <div className="space-y-4">
-            {['15+ Years of dedicated service', '50,000+ Lives transformed globally', '90% of donations go directly to programs'].map((item) => (
+            {about.bullets.map((item) => (
               <div key={item} className="flex items-start space-x-3">
                 <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600"><Icon name="fa-check" className="text-xs text-white" /></div>
                 <p className="text-gray-600">{item}</p>
@@ -100,11 +99,12 @@ export function AboutSection() {
 }
 
 export function ProgramsSection({ navigate }) {
+  const cms = useCmsContent();
   return (
     <section id="programs" className="bg-white py-20">
-      <SectionTitle eyebrow="What We Do" title="Our Core Programs" text="Comprehensive initiatives designed to create sustainable change" />
+      <SectionTitle eyebrow={cms.pages.programs.eyebrow} title="Our Core Programs" text="Comprehensive initiatives designed to create sustainable change" />
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-2 lg:grid-cols-3">
-        {programs.map((program) => (
+        {cms.programs.map((program) => (
           <div key={program.title} className="aos-lite hover-lift overflow-hidden rounded-xl bg-white shadow-lg">
             <div className={`relative h-48 bg-gradient-to-r ${program.colors}`}>
               <img src={program.image} alt={`${program.title} program activity`} className="h-full w-full object-cover" />
@@ -165,6 +165,55 @@ export function GallerySection() {
   );
 }
 
+export function TeamSection() {
+  const cms = useCmsContent();
+  return (
+    <section className="bg-gray-50 py-20">
+      <SectionTitle eyebrow="Our Team" title="People Behind the Mission" text="Meet the team coordinating WCDI programs, partnerships, and community outreach." />
+      <div className="container mx-auto grid gap-8 px-6 md:grid-cols-2 lg:grid-cols-3">
+        {cms.team.map((member) => (
+          <article key={member.name} className="aos-lite hover-lift overflow-hidden rounded-xl bg-white shadow-lg">
+            <div className="h-72 bg-gray-100">
+              <img src={member.image} alt={member.name} className="h-full w-full object-cover object-top" />
+            </div>
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900">{member.name}</h3>
+              <p className="mt-1 font-semibold text-orange-600">{member.role}</p>
+              <p className="mt-4 text-gray-600">{member.bio}</p>
+              {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" aria-label={`${member.name} LinkedIn profile`} title="LinkedIn" className="mt-5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 text-white hover:bg-blue-800"><i className="fab fa-linkedin-in" /></a>}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function TestimonialsSection() {
+  const cms = useCmsContent();
+  return (
+    <section className="bg-white py-20">
+      <SectionTitle eyebrow="Testimonials" title="What People Say" text="Stories from families, volunteers, and partners connected to WCDI programs." />
+      <div className="container mx-auto grid gap-8 px-6 lg:grid-cols-3">
+        {cms.testimonials.map((item) => (
+          <article key={item.name} className="aos-lite rounded-xl bg-gray-50 p-8 shadow">
+            <Icon name="fa-quote-left" className="mb-5 text-4xl text-orange-500" />
+            <p className="text-lg leading-relaxed text-gray-700">"{item.quote}"</p>
+            <div className="mt-6 flex items-center gap-4">
+              <img src={item.image} alt={item.name} className="h-14 w-14 rounded-full object-cover" />
+              <div>
+                <h3 className="font-bold text-gray-900">{item.name}</h3>
+                <p className="text-sm text-gray-500">{item.role}</p>
+                {item.linkedin && <a href={item.linkedin} target="_blank" rel="noreferrer" aria-label={`${item.name} LinkedIn profile`} title="LinkedIn" className="mt-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-700 text-white hover:bg-blue-800"><i className="fab fa-linkedin-in" /></a>}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function DonationSection() {
   const [amount, setAmount] = useState(null);
   const [custom, setCustom] = useState('');
@@ -173,25 +222,61 @@ export function DonationSection() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [donor, setDonor] = useState({ name: '', email: '' });
+  const [paymentError, setPaymentError] = useState('');
+  const [reference, setReference] = useState(() => `WCDI_${Date.now()}`);
   const selectedAmount = custom ? Number(custom) : amount;
+  const paymentConfig = usePaymentConfig({ amount: selectedAmount, email: donor.email, reference });
 
-  const submitPayment = async (event) => {
-    event.preventDefault();
+  const recordDonation = async (paymentReference = {}) => {
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    setPaymentError('');
     const nextReceipt = {
-      transactionId: `TXN_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      transactionId: paymentReference.reference || paymentReference.trxref || reference,
       amount: selectedAmount,
       program,
       recurring,
+      donorName: donor.name,
+      email: donor.email,
+      currency: paymentConfig.currency,
+      paymentProvider: paymentConfig.enabled ? 'paystack' : 'demo',
       date: new Date().toISOString(),
-      email: event.currentTarget.cardName.value || 'Donor'
+      providerResponse: paymentReference
     };
-    writeJson('donations', [...readJson('donations'), nextReceipt]);
-    localStorage.setItem('last_receipt', JSON.stringify(nextReceipt));
-    setLoading(false);
-    setPaymentOpen(false);
-    setReceipt(nextReceipt);
+    try {
+      await submitDonation(nextReceipt);
+      writeJson('donations', [...readJson('donations'), nextReceipt]);
+      localStorage.setItem('last_receipt', JSON.stringify(nextReceipt));
+      setPaymentOpen(false);
+      setReceipt(nextReceipt);
+    } catch (error) {
+      const offlineReceipt = { ...nextReceipt, syncStatus: 'failed', syncError: error.message };
+      writeJson('donations', [...readJson('donations'), offlineReceipt]);
+      localStorage.setItem('last_receipt', JSON.stringify(offlineReceipt));
+      setPaymentOpen(false);
+      setReceipt(offlineReceipt);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openPayment = () => {
+    if (!(selectedAmount > 0)) {
+      alert('Please select or enter a donation amount');
+      return;
+    }
+    setDonor({ name: '', email: '' });
+    setPaymentError('');
+    setReference(`WCDI_${Date.now()}`);
+    setPaymentOpen(true);
+  };
+
+  const startDemoPayment = () => {
+    if (!donor.email) {
+      setPaymentError('Please enter your email address before continuing.');
+      return;
+    }
+    recordDonation({ reference, status: 'demo_success' });
   };
 
   return (
@@ -219,7 +304,7 @@ export function DonationSection() {
             <option value="nutrition">Nutrition Program</option>
           </select>
           <label className="mb-6 flex items-center"><input type="checkbox" checked={recurring} onChange={(event) => setRecurring(event.target.checked)} className="mr-3" />Make this a monthly donation (recurring)</label>
-          <button className="w-full rounded-lg bg-orange-600 py-3 text-lg font-bold text-white transition-all hover:scale-[1.01] hover:bg-orange-700" onClick={() => selectedAmount > 0 ? setPaymentOpen(true) : alert('Please select or enter a donation amount')}>
+          <button className="w-full rounded-lg bg-orange-600 py-3 text-lg font-bold text-white transition-all hover:scale-[1.01] hover:bg-orange-700" onClick={openPayment}>
             <Icon name="fa-heart" className="mr-2" />Donate Now
           </button>
           <div className="mt-6 text-center text-sm text-gray-500">
@@ -232,22 +317,34 @@ export function DonationSection() {
       {paymentOpen && (
         <Modal onClose={() => setPaymentOpen(false)}>
           <h3 className="mb-6 text-2xl font-bold">Complete Your Donation</h3>
-          <div className="mb-4 rounded-lg bg-orange-50 p-4">
-            <p className="text-sm text-gray-600">Donation Amount</p>
-            <p className="text-2xl font-bold text-orange-600">${selectedAmount}</p>
-            {recurring && <p className="text-sm text-gray-500">Monthly Recurring</p>}
-            <p className="mt-1 text-sm text-gray-500">Program: {program}</p>
-          </div>
-          <form onSubmit={submitPayment}>
-            <Input name="cardName" label="Cardholder Name" required />
-            <Input name="cardNumber" label="Card Number" placeholder="1234 5678 9012 3456" required />
-            <div className="grid grid-cols-2 gap-4">
-              <Input name="expiry" label="Expiry Date" placeholder="MM/YY" required />
-              <Input name="cvv" label="CVV" placeholder="123" required />
+          <div className="mb-5 overflow-hidden rounded-xl bg-gray-950 text-white shadow-xl">
+            <div className="flex items-start justify-between bg-gradient-to-r from-orange-600 to-red-600 p-5">
+              <div>
+                <p className="text-sm text-white/80">Donation card</p>
+                <p className="mt-1 text-3xl font-bold">{paymentConfig.currency} {selectedAmount}</p>
+              </div>
+              <Icon name="fa-credit-card" className="text-3xl text-white/90" />
             </div>
-            <button disabled={loading} className="mt-4 w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700">{loading ? 'Processing...' : `Donate $${selectedAmount}`}</button>
-          </form>
-          <p className="mt-4 text-center text-xs text-gray-500"><Icon name="fa-lock" className="mr-1" />Secure payment processing</p>
+            <div className="grid gap-3 p-5 text-sm text-gray-300">
+              <div className="flex justify-between gap-4"><span>Program</span><strong className="text-right text-white">{program}</strong></div>
+              <div className="flex justify-between gap-4"><span>Schedule</span><strong className="text-white">{recurring ? 'Monthly' : 'One time'}</strong></div>
+              <div className="flex justify-between gap-4"><span>Reference</span><strong className="text-right text-white">{reference}</strong></div>
+              <div className="flex justify-between gap-4"><span>Payment</span><strong className="text-white">{paymentConfig.enabled ? 'Paystack' : 'Demo mode'}</strong></div>
+            </div>
+          </div>
+          <Input name="donorName" label="Full Name" value={donor.name} onChange={(event) => setDonor((value) => ({ ...value, name: event.target.value }))} required />
+          <Input name="donorEmail" type="email" label="Email Address" value={donor.email} onChange={(event) => setDonor((value) => ({ ...value, email: event.target.value }))} required />
+          {paymentError && <p className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700">{paymentError}</p>}
+          <PaystackButton
+            config={paymentConfig}
+            disabled={loading || !donor.email}
+            label={loading ? 'Processing...' : `Donate ${paymentConfig.currency} ${selectedAmount}`}
+            onClose={() => setPaymentError('Payment window closed before completion.')}
+            onFallback={startDemoPayment}
+            onSuccess={recordDonation}
+          />
+          {!paymentConfig.enabled && <p className="mt-3 rounded-lg bg-yellow-50 p-3 text-sm text-yellow-700">Paystack is not configured. This records a demo donation locally and posts to the backend when available.</p>}
+          <p className="mt-4 text-center text-xs text-gray-500"><Icon name="fa-lock" className="mr-1" />Secure payment processing via configured provider</p>
         </Modal>
       )}
       {receipt && (
@@ -258,9 +355,11 @@ export function DonationSection() {
             <p className="mb-4 text-gray-600">Your generosity makes a difference in the lives of women and children.</p>
             <div className="mb-4 rounded-lg bg-gray-50 p-4 text-left text-sm">
               <p><strong>Transaction ID:</strong> {receipt.transactionId}</p>
-              <p><strong>Amount:</strong> ${receipt.amount}</p>
+              <p><strong>Amount:</strong> {receipt.currency || 'KES'} {receipt.amount}</p>
               <p><strong>Program:</strong> {receipt.program}</p>
+              <p><strong>Donor:</strong> {receipt.donorName || receipt.email || 'Donor'}</p>
               <p><strong>Date:</strong> {new Date(receipt.date).toLocaleString()}</p>
+              {receipt.syncStatus === 'failed' && <p className="mt-2 text-orange-700"><strong>Backend sync:</strong> Pending</p>}
             </div>
             <button onClick={() => window.print()} className="mr-3 rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-700"><Icon name="fa-print" className="mr-2" />Print Receipt</button>
             <button onClick={() => setReceipt(null)} className="rounded-lg bg-orange-600 px-6 py-2 text-white hover:bg-orange-700">Close</button>
@@ -273,19 +372,31 @@ export function DonationSection() {
 
 export function Newsletter() {
   const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [loading, setLoading] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setMessage('Please enter a valid email address');
+      setMessage({ type: 'error', text: 'Please enter a valid email address' });
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    saveSubscriber(email);
-    saveSubmission('newsletter', { email, subscribedAt: new Date().toISOString() });
-    setEmail('');
-    setMessage('Successfully subscribed to newsletter!');
+    const payload = { email, source: 'website', subscribedAt: new Date().toISOString() };
+    setLoading(true);
+    try {
+      await submitNewsletter(payload);
+      saveSubscriber(email);
+      saveSubmission('newsletter', payload);
+      setEmail('');
+      setMessage({ type: 'success', text: 'Successfully subscribed to newsletter!' });
+    } catch (error) {
+      saveSubscriber(email);
+      saveSubmission('newsletter', { ...payload, syncStatus: 'failed', syncError: error.message });
+      setEmail('');
+      setMessage({ type: 'error', text: 'Subscribed locally, but backend sync is pending.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -298,9 +409,9 @@ export function Newsletter() {
         <form onSubmit={submit} className="aos-lite w-full md:w-auto">
           <div className="flex flex-col gap-3 sm:flex-row">
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Your email address" className="w-full rounded-lg px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500 sm:w-80" required />
-            <button className="rounded-lg bg-orange-600 px-6 py-3 font-semibold transition hover:scale-105 hover:bg-orange-700">Subscribe <Icon name="fa-paper-plane" className="ml-2" /></button>
+            <button disabled={loading} className="rounded-lg bg-orange-600 px-6 py-3 font-semibold transition hover:scale-105 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'Subscribing...' : 'Subscribe'} <Icon name="fa-paper-plane" className="ml-2" /></button>
           </div>
-          {message && <div className={`mt-3 text-sm ${message.startsWith('Successfully') ? 'text-green-400' : 'text-red-300'}`}>{message}</div>}
+          {message.text && <div className={`mt-3 text-sm ${message.type === 'success' ? 'text-green-400' : 'text-red-300'}`}>{message.text}</div>}
         </form>
       </div>
     </section>
@@ -308,10 +419,11 @@ export function Newsletter() {
 }
 
 export function EventsSection() {
+  const cms = useCmsContent();
   return (
     <section className="bg-gray-50 py-20">
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-3">
-        {events.map(([day, month, title, text]) => (
+        {cms.events.map(({ day, month, title, text }) => (
           <div key={title} className="hover-lift overflow-hidden rounded-2xl bg-white shadow-lg">
             <div className="bg-orange-600 p-6 text-center text-white"><span className="block text-4xl font-extrabold">{day}</span><span className="text-sm uppercase">{month}</span></div>
             <div className="p-6"><h3 className="mb-2 text-xl font-bold">{title}</h3><p className="text-gray-600">{text}</p></div>
@@ -323,10 +435,11 @@ export function EventsSection() {
 }
 
 export function BlogSection({ navigate }) {
+  const cms = useCmsContent();
   return (
     <section className="bg-gray-50 py-20">
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-3">
-        {posts.map(([category, title, text, image]) => (
+        {cms.posts.map(({ category, title, text, image }) => (
           <article key={title} className="hover-lift overflow-hidden rounded-2xl bg-white shadow-lg">
             <div className="h-48 overflow-hidden"><img src={image} alt={title} className="h-full w-full object-cover transition duration-300 hover:scale-105" /></div>
             <div className="p-6"><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">{category}</span><h3 className="mb-2 mt-4 text-xl font-bold">{title}</h3><p className="mb-4 text-gray-600">{text}</p><LinkButton href="/blog-single" navigate={navigate} className="font-semibold text-orange-600">Read More <Icon name="fa-arrow-right" className="ml-1" /></LinkButton></div>
@@ -338,14 +451,11 @@ export function BlogSection({ navigate }) {
 }
 
 export function GetInvolved({ navigate }) {
+  const cms = useCmsContent();
   return (
     <section className="bg-white py-20">
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-3">
-        {[
-          ['fa-heart', 'Donate', 'Fund programs that improve education, healthcare, and economic opportunity.', '/donate'],
-          ['fa-user-plus', 'Volunteer', 'Offer your skills locally or remotely through WCDI projects.', '/volunteer'],
-          ['fa-handshake', 'Partner', 'Collaborate on programs, events, advocacy, and community outreach.', '/contact']
-        ].map(([icon, title, text, href]) => (
+        {cms.involvement.map(({ icon, title, text, href }) => (
           <div key={title} className="hover-lift rounded-2xl bg-gray-50 p-8 shadow">
             <Icon name={icon} className="mb-5 text-5xl text-orange-600" />
             <h3 className="mb-2 text-2xl font-bold">{title}</h3>

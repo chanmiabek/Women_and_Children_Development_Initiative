@@ -1,5 +1,5 @@
 import React from 'react';
-import { AboutSection, BlogSection, DonationSection, EventsSection, GallerySection, Hero, ImpactSection, Partners, ProgramsSection, Stats } from '../components/sections.jsx';
+import { AboutSection, BlogSection, DonationSection, EventsSection, GallerySection, Hero, ImpactSection, Partners, ProgramsSection, Stats, TeamSection, TestimonialsSection } from '../components/sections.jsx';
 
 export function HomePage({ navigate }) {
   return (
@@ -10,6 +10,8 @@ export function HomePage({ navigate }) {
       <ProgramsSection navigate={navigate} />
       <ImpactSection />
       <GallerySection />
+      <TeamSection />
+      <TestimonialsSection />
       <EventsSection />
       <BlogSection navigate={navigate} />
       <Partners />

@@ -45,6 +45,18 @@ body {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
+.page-hero-bg,
+.home-hero-bg {
+  background-attachment: fixed;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.home-hero-bg {
+  background-position: center top;
+}
+
 .gradient-footer {
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
 }
@@ -132,5 +144,12 @@ body {
 @media print {
   .no-print {
     display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-hero-bg,
+  .home-hero-bg {
+    background-attachment: scroll;
   }
 }

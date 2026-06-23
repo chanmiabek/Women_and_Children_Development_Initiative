@@ -6,8 +6,10 @@ import { Icon, LinkButton } from './ui.jsx';
 export function Layout({ children, navigate, path }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { scrolled, hidden, showTop, progress } = useScrollUi();
+  //const currentYear = new Date().getFullYear();
 
   return (
+
     <div className="bg-gray-50 text-gray-900">
       <div className="fixed left-0 top-0 z-[10000] h-[3px] bg-gradient-to-r from-orange-500 to-orange-700 transition-all" style={{ width: `${progress}%` }} />
       <TopBar />
@@ -76,7 +78,7 @@ function TopBar() {
     <div className="bg-gray-900 py-2 text-sm text-white">
       <div className="container mx-auto flex items-center justify-between px-6">
         <div className="flex flex-wrap gap-x-6 gap-y-1">
-          <span><Icon name="fa-phone-alt" className="mr-2 text-orange-500" />+1 (888) 123-4567</span>
+          <span><Icon name="fa-phone-alt" className="mr-2 text-orange-500" />+254799091016</span>
           <span><Icon name="fa-envelope" className="mr-2 text-orange-500" />info@wcdevinitiative.org</span>
         </div>
         <div className="hidden space-x-4 sm:flex">
@@ -93,7 +95,7 @@ function Footer({ navigate }) {
       <div className="container mx-auto px-6">
         <div className="mb-12 grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <div className="mb-4 flex items-center space-x-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-600"><Icon name="fa-hands-helping" /></div><div><h3 className="text-lg font-bold">WCDI</h3><p className="text-xs text-gray-400">Est. 2010</p></div></div>
+            <div className="mb-4 flex items-center space-x-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-600"><Icon name="fa-hands-helping" /></div><div><h3 className="text-lg font-bold">WCDI</h3><p className="text-xs text-gray-400">Est. 2018</p></div></div>
             <p className="mb-4 leading-relaxed text-gray-400">Empowering women and children through sustainable development programs worldwide.</p>
             <div className="flex space-x-4">{['facebook-f', 'twitter', 'instagram', 'linkedin-in', 'youtube'].map((item) => <a key={item} href="#" className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800 transition hover:bg-orange-600"><i className={`fab fa-${item}`} /></a>)}</div>
           </div>
@@ -110,7 +112,8 @@ function Footer({ navigate }) {
           </div>
         </div>
         <div className="border-t border-gray-800 pt-8 text-sm text-gray-400 md:flex md:items-center md:justify-between">
-          <p>&copy; 2024 Women and Children Development Initiative. All rights reserved.</p>
+
+          <p>&copy; 2026, Women and Children Development Initiative(WCDI). All rights reserved.</p>
           <p className="mt-2 md:mt-0">Registered Charity #: 88-1234567 | EIN: 12-3456789</p>
         </div>
       </div>

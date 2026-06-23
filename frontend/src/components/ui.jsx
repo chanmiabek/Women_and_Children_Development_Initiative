@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import communityImage from '../../assets/images/community.jpeg';
 
 export function Icon({ name, className = '' }) {
   return <i className={`fas ${name} ${className}`} aria-hidden="true" />;
@@ -10,7 +11,8 @@ export function LinkButton({ href, navigate, children, className }) {
       href={href}
       className={className}
       onClick={(event) => {
-        if (href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+        if (href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:'))
+           return;
         event.preventDefault();
         navigate(href);
       }}
@@ -58,10 +60,11 @@ export function SectionTitle({ eyebrow, title, text }) {
   );
 }
 
-export function PageHero({ eyebrow, title, text, icon }) {
+export function PageHero({ eyebrow, title, text, icon, backgroundImage = communityImage }) {
   return (
-    <section className="gradient-hero py-20 text-white">
-      <div className="container mx-auto px-6 text-center">
+    <section className="page-hero-bg relative overflow-hidden py-24 text-white" style={{ backgroundImage: `url("${backgroundImage}")` }}>
+      <div className="absolute inset-0 bg-gray-950/70" />
+      <div className="relative z-10 container mx-auto px-6 text-center">
         {eyebrow && <p className="mb-2 font-semibold uppercase tracking-wide text-yellow-300">{eyebrow}</p>}
         <Icon name={icon} className="mb-5 text-6xl" />
         <h1 className="mb-4 text-4xl font-bold md:text-5xl">{title}</h1>
