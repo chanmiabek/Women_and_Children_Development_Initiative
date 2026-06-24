@@ -1,15 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DataTable, Icon } from '../components/ui.jsx';
-import { fetchDashboard, hasBackend } from '../services/api.js';
+import { adminLogin, fetchDashboard, hasBackend } from '../services/api.js';
 import { editablePages, readCmsContent, resetCmsContent, writeCmsContent } from '../utils/cms.js';
 import { formatDate, normalizeSubscriberEmail, readJson } from '../utils/storage.js';
 
 const ADMIN_SESSION_KEY = 'wcdi_admin_session';
-const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'wcdi2026';
 
 export function DashboardPage({ navigate }) {
-  const [authenticated, setAuthenticated] = useState(() => localStorage.getItem(ADMIN_SESSION_KEY) === 'active');
+  const [session, setSession] = useState(() => JSON.parse(localStorage.getItem(ADMIN_SESSION_KEY) || 'null'));
+  const authenticated = Boolean(session?.token);
   const [activePanel, setActivePanel] = useState('content');
   const [tick, setTick] = useState(0);
   const [remoteData, setRemoteData] = useState(null);
@@ -33,7 +32,7 @@ export function DashboardPage({ navigate }) {
     if (!authenticated || !hasBackend()) return undefined;
     let active = true;
     setRemoteStatus('Syncing backend data...');
-    fetchDashboard()
+    fetchDashboard(session.token)
       .then((payload) => {
         if (!active) return;
         setRemoteData(payload);
@@ -47,10 +46,10 @@ export function DashboardPage({ navigate }) {
     return () => {
       active = false;
     };
-  }, [authenticated, tick]);
+  }, [authenticated, session?.token, tick]);
 
   if (!authenticated) {
-    return <AdminLogin navigate={navigate} onLogin={() => setAuthenticated(true)} />;
+    return <AdminLogin navigate={navigate} onLogin={(nextSession) => setSession(nextSession)} />;
   }
 
   const saveCms = (nextCms, status = 'Changes saved') => {
@@ -89,7 +88,7 @@ export function DashboardPage({ navigate }) {
 
   const logout = () => {
     localStorage.removeItem(ADMIN_SESSION_KEY);
-    setAuthenticated(false);
+    setSession(null);
   };
 
   const exportData = () => {
@@ -104,7 +103,7 @@ export function DashboardPage({ navigate }) {
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 lg:flex">
-      <aside className="bg-gray-950 p-6 text-white lg:w-72">
+      <aside className="bg-gray-950 p-6 text-white lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:overflow-y-auto">
         <div className="mb-10 flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-600"><Icon name="fa-screwdriver-wrench" /></div>
           <div><h1 className="text-xl font-bold">Admin Tools</h1><p className="text-xs text-gray-400">Content manager</p></div>
@@ -125,7 +124,7 @@ export function DashboardPage({ navigate }) {
         </nav>
       </aside>
       <main className="flex-1">
-        <header className="flex flex-col gap-4 border-b bg-white p-6 md:flex-row md:items-center md:justify-between">
+        <header className="sticky top-0 z-30 flex flex-col gap-4 border-b bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
           <div><p className="text-sm font-semibold uppercase tracking-wide text-orange-600">{activePanel === 'content' ? 'Create, edit, update, and delete website content' : remoteStatus}</p><h2 className="text-3xl font-bold">WCDI Admin Tools</h2>{message && <p className="mt-2 text-sm font-semibold text-green-700">{message}</p>}</div>
           <div className="flex flex-wrap gap-3">
             <button onClick={exportData} className="rounded-lg bg-gray-900 px-5 py-3 font-semibold text-white hover:bg-gray-800"><Icon name="fa-download" className="mr-2" />Export JSON</button>
@@ -187,15 +186,21 @@ export function DashboardPage({ navigate }) {
 
 function AdminLogin({ navigate, onLogin }) {
   const [error, setError] = useState('');
-  const submit = (event) => {
+  const [loading, setLoading] = useState(false);
+  const submit = async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
-    if (data.username === ADMIN_USERNAME && data.password === ADMIN_PASSWORD) {
-      localStorage.setItem(ADMIN_SESSION_KEY, 'active');
-      onLogin();
-      return;
+    setError('');
+    setLoading(true);
+    try {
+      const session = await adminLogin(data);
+      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+      onLogin(session);
+    } catch (error) {
+      setError(error.message || 'Invalid admin username or password.');
+    } finally {
+      setLoading(false);
     }
-    setError('Invalid admin username or password.');
   };
 
   return (
@@ -209,9 +214,9 @@ function AdminLogin({ navigate, onLogin }) {
         <AdminInput label="Username" name="username" />
         <AdminInput label="Password" name="password" type="password" />
         {error && <p className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700">{error}</p>}
-        <button className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700">Login</button>
+        <button disabled={loading} className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'Signing in...' : 'Login'}</button>
         <button type="button" onClick={() => navigate('/')} className="mt-3 w-full rounded-lg border py-3 font-semibold text-gray-700 hover:bg-gray-50">Back to Website</button>
-        <p className="mt-4 text-center text-xs text-gray-500">Local default: admin / wcdi2026. Set VITE_ADMIN_USERNAME and VITE_ADMIN_PASSWORD for deployment.</p>
+        <p className="mt-4 text-center text-xs text-gray-500">Admin access is verified by the backend. Keep credentials only in backend environment variables.</p>
       </form>
     </main>
   );

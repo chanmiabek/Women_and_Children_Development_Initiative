@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { featuredImages, galleryImages } from '../data/siteData.js';
-import { PaystackButton } from './PaystackButton.jsx';
-import { submitDonation, submitNewsletter } from '../services/api.js';
+import { initiateMpesaPayment, submitDonation, submitNewsletter, verifyPaystackPayment } from '../services/api.js';
 import { useCmsContent } from '../hooks/useCmsContent.js';
 import { usePaymentConfig } from '../hooks/usePayment.js';
 import { readJson, saveSubscriber, saveSubmission, writeJson } from '../utils/storage.js';
@@ -215,60 +214,140 @@ export function TestimonialsSection() {
 }
 
 export function DonationSection() {
-  const [amount, setAmount] = useState(null);
-  const [custom, setCustom] = useState('');
+  const defaultAmount = Number(import.meta.env.VITE_DEFAULT_DONATION_AMOUNT || 200);
+  const defaultEmail = import.meta.env.VITE_DEFAULT_DONOR_EMAIL || 'donor@wcdi.org';
+  const [amount, setAmount] = useState(defaultAmount);
   const [program, setProgram] = useState('general');
   const [recurring, setRecurring] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [donor, setDonor] = useState({ name: '', email: '' });
+  const [donor, setDonor] = useState({ name: '', email: defaultEmail, phone: '' });
   const [paymentError, setPaymentError] = useState('');
   const [reference, setReference] = useState(() => `WCDI_${Date.now()}`);
-  const selectedAmount = custom ? Number(custom) : amount;
+  const [provider, setProvider] = useState('');
+  const selectedAmount = amount;
   const paymentConfig = usePaymentConfig({ amount: selectedAmount, email: donor.email, reference });
+  const mpesaEnabled = import.meta.env.VITE_ENABLE_MPESA !== 'false';
+  const paystackPaymentPageUrl = import.meta.env.VITE_PAYSTACK_PAYMENT_PAGE_URL || '';
 
-  const recordDonation = async (paymentReference = {}) => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paystackReference = params.get('reference') || params.get('trxref');
+    if (!paystackReference) return;
+
+    let active = true;
+    verifyPaystackPayment(paystackReference)
+      .then((verification) => {
+        if (!active) return;
+        const savedReceipt = JSON.parse(localStorage.getItem('last_receipt') || 'null');
+        const verifiedReceipt = {
+          ...(savedReceipt || {}),
+          transactionId: paystackReference,
+          paymentProvider: 'paystack',
+          paymentStatus: verification.data?.status || 'paid',
+          providerResponse: verification,
+          date: savedReceipt?.date || new Date().toISOString()
+        };
+        storeReceipt(verifiedReceipt);
+        window.history.replaceState({}, '', window.location.pathname);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setPaymentError(error.message);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const buildReceipt = (paymentReference = {}, paymentProvider = provider) => ({
+    transactionId: paymentReference.reference || paymentReference.trxref || paymentReference.transactionId || reference,
+    amount: selectedAmount,
+    program,
+    recurring,
+    donorName: donor.name,
+    email: donor.email,
+    phone: donor.phone,
+    currency: paymentConfig.currency,
+    paymentProvider,
+    date: new Date().toISOString(),
+    providerResponse: paymentReference
+  });
+
+  const storeReceipt = (nextReceipt) => {
+    writeJson('donations', [...readJson('donations'), nextReceipt]);
+    localStorage.setItem('last_receipt', JSON.stringify(nextReceipt));
+    setPaymentOpen(false);
+    setReceipt(nextReceipt);
+  };
+
+  const recordDonation = async (paymentReference = {}, paymentProvider = provider) => {
     setLoading(true);
     setPaymentError('');
-    const nextReceipt = {
-      transactionId: paymentReference.reference || paymentReference.trxref || reference,
-      amount: selectedAmount,
-      program,
-      recurring,
-      donorName: donor.name,
-      email: donor.email,
-      currency: paymentConfig.currency,
-      paymentProvider: paymentConfig.enabled ? 'paystack' : 'demo',
-      date: new Date().toISOString(),
-      providerResponse: paymentReference
-    };
+    const nextReceipt = buildReceipt(paymentReference, paymentProvider);
     try {
       await submitDonation(nextReceipt);
-      writeJson('donations', [...readJson('donations'), nextReceipt]);
-      localStorage.setItem('last_receipt', JSON.stringify(nextReceipt));
-      setPaymentOpen(false);
-      setReceipt(nextReceipt);
+      storeReceipt(nextReceipt);
     } catch (error) {
-      const offlineReceipt = { ...nextReceipt, syncStatus: 'failed', syncError: error.message };
-      writeJson('donations', [...readJson('donations'), offlineReceipt]);
-      localStorage.setItem('last_receipt', JSON.stringify(offlineReceipt));
-      setPaymentOpen(false);
-      setReceipt(offlineReceipt);
+      storeReceipt({ ...nextReceipt, syncStatus: 'failed', syncError: error.message });
     } finally {
       setLoading(false);
     }
   };
 
-  const openPayment = () => {
-    if (!(selectedAmount > 0)) {
-      alert('Please select or enter a donation amount');
+  const startMpesaPayment = async () => {
+    if (!donor.email || !donor.phone) {
+      setPaymentError('Please enter your email and M-Pesa phone number before continuing.');
       return;
     }
-    setDonor({ name: '', email: '' });
+    if (!(selectedAmount > 0)) {
+      setPaymentError('Please enter a donation amount.');
+      return;
+    }
+    setLoading(true);
     setPaymentError('');
+    const nextReceipt = buildReceipt({ reference }, 'mpesa');
+    try {
+      const response = await initiateMpesaPayment({
+        ...nextReceipt,
+        reference,
+        phone: donor.phone
+      });
+      storeReceipt({
+        ...nextReceipt,
+        paymentStatus: 'pending',
+        checkoutRequestId: response.data?.mpesa?.CheckoutRequestID,
+        providerResponse: response,
+        mpesaMessage: 'STK Push sent. Complete the payment prompt on your phone.'
+      });
+    } catch (error) {
+      setPaymentError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openPayment = (method) => {
+    setDonor({ name: '', email: defaultEmail, phone: '' });
+    setAmount(defaultAmount);
+    setPaymentError('');
+    setProvider(method);
     setReference(`WCDI_${Date.now()}`);
     setPaymentOpen(true);
+  };
+
+  const openPaystackPaymentPage = () => {
+    setPaymentError('');
+    if (!paystackPaymentPageUrl) {
+      setPaymentError('Add VITE_PAYSTACK_PAYMENT_PAGE_URL to frontend/.env to let donors enter amount on Paystack.');
+      return;
+    }
+    const popup = window.open(paystackPaymentPageUrl, 'paystack_payment', 'width=760,height=760,noopener,noreferrer');
+    if (!popup) {
+      setPaymentError('Allow popups for this site to open the Paystack payment page.');
+    }
   };
 
   const startDemoPayment = () => {
@@ -276,74 +355,41 @@ export function DonationSection() {
       setPaymentError('Please enter your email address before continuing.');
       return;
     }
-    recordDonation({ reference, status: 'demo_success' });
+    if (!(selectedAmount > 0)) {
+      setPaymentError('Please enter a donation amount.');
+      return;
+    }
+    recordDonation({ reference, status: 'demo_success' }, 'demo');
   };
 
   return (
     <section id="donate" className="bg-gradient-to-r from-orange-600 to-red-600 py-20 text-white">
       <SectionTitle eyebrow="Make a Difference Today" title="Your Donation Changes Lives" text="Every contribution, no matter the size, helps us reach more women and children in need." />
       <div className="container mx-auto px-6">
-        <div className="aos-lite mx-auto max-w-4xl rounded-2xl bg-white p-8 text-gray-800 shadow-2xl">
-          <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-            {[25, 50, 100, 500].map((value) => (
-              <button key={value} className={`rounded-lg py-3 font-semibold transition-all ${amount === value && !custom ? 'bg-orange-600 text-white' : 'bg-gray-100 hover:bg-orange-600 hover:text-white'}`} onClick={() => { setAmount(value); setCustom(''); }}>${value}</button>
-            ))}
-          </div>
-          <label className="mb-2 block font-semibold text-gray-700">Custom Amount (USD)</label>
-          <div className="relative mb-6">
-            <span className="absolute left-4 top-3 text-gray-500">$</span>
-            <input type="number" value={custom} onChange={(event) => setCustom(event.target.value)} className="w-full rounded-lg border border-gray-300 py-3 pl-8 pr-4 focus:border-orange-600 focus:outline-none" placeholder="Enter amount" />
-          </div>
-          <label className="mb-2 block font-semibold text-gray-700">Select a Program to Support (Optional)</label>
-          <select value={program} onChange={(event) => setProgram(event.target.value)} className="mb-6 w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-orange-600 focus:outline-none">
-            <option value="general">General Fund (Where needed most)</option>
-            <option value="education">Education Program</option>
-            <option value="healthcare">Healthcare Program</option>
-            <option value="empowerment">Economic Empowerment</option>
-            <option value="water">Clean Water Access</option>
-            <option value="nutrition">Nutrition Program</option>
-          </select>
-          <label className="mb-6 flex items-center"><input type="checkbox" checked={recurring} onChange={(event) => setRecurring(event.target.checked)} className="mr-3" />Make this a monthly donation (recurring)</label>
-          <button className="w-full rounded-lg bg-orange-600 py-3 text-lg font-bold text-white transition-all hover:scale-[1.01] hover:bg-orange-700" onClick={openPayment}>
-            <Icon name="fa-heart" className="mr-2" />Donate Now
+        <div className="aos-lite mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
+          <button type="button" onClick={openPaystackPaymentPage} className="rounded-lg border-2 border-white bg-white px-8 py-5 text-xl font-bold text-[#00A9D6] shadow-xl transition hover:scale-[1.01] hover:bg-sky-50">
+            <Icon name="fa-credit-card" className="mr-3" />Paystack
           </button>
-          <div className="mt-6 text-center text-sm text-gray-500">
-            <span className="mx-2"><Icon name="fa-lock" className="mr-1" />Secure Payment</span>
-            <span className="mx-2"><Icon name="fa-receipt" className="mr-1" />Tax Receipt Provided</span>
-            <span className="mx-2"><Icon name="fa-shield-alt" className="mr-1" />100% Secure</span>
-          </div>
+          <button type="button" onClick={() => openPayment('mpesa')} disabled={!mpesaEnabled} className="rounded-lg border-2 border-white bg-white px-8 py-5 text-xl font-bold text-green-700 shadow-xl transition hover:scale-[1.01] hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60">
+            <Icon name="fa-mobile-screen" className="mr-3" />M-Pesa
+          </button>
         </div>
+        {paymentError && <p className="mx-auto mt-4 max-w-3xl rounded-lg bg-white/95 p-3 text-sm text-red-700">{paymentError}</p>}
       </div>
       {paymentOpen && (
         <Modal onClose={() => setPaymentOpen(false)}>
-          <h3 className="mb-6 text-2xl font-bold">Complete Your Donation</h3>
-          <div className="mb-5 overflow-hidden rounded-xl bg-gray-950 text-white shadow-xl">
-            <div className="flex items-start justify-between bg-gradient-to-r from-orange-600 to-red-600 p-5">
-              <div>
-                <p className="text-sm text-white/80">Donation card</p>
-                <p className="mt-1 text-3xl font-bold">{paymentConfig.currency} {selectedAmount}</p>
-              </div>
-              <Icon name="fa-credit-card" className="text-3xl text-white/90" />
-            </div>
-            <div className="grid gap-3 p-5 text-sm text-gray-300">
-              <div className="flex justify-between gap-4"><span>Program</span><strong className="text-right text-white">{program}</strong></div>
-              <div className="flex justify-between gap-4"><span>Schedule</span><strong className="text-white">{recurring ? 'Monthly' : 'One time'}</strong></div>
-              <div className="flex justify-between gap-4"><span>Reference</span><strong className="text-right text-white">{reference}</strong></div>
-              <div className="flex justify-between gap-4"><span>Payment</span><strong className="text-white">{paymentConfig.enabled ? 'Paystack' : 'Demo mode'}</strong></div>
-            </div>
+          <h3 className="mb-6 text-2xl font-bold">M-Pesa Donation</h3>
+          <div className="mb-2 rounded-xl bg-gray-50 p-4">
+            <Input name="donorName" label="Full Name" value={donor.name} onChange={(event) => setDonor((value) => ({ ...value, name: event.target.value }))} required />
+            <Input name="donorEmail" type="email" label="Email Address" value={donor.email} onChange={(event) => setDonor((value) => ({ ...value, email: event.target.value }))} required />
+            <Input name="donorPhone" type="tel" label="M-Pesa Phone Number" value={donor.phone} onChange={(event) => setDonor((value) => ({ ...value, phone: event.target.value }))} required />
+            <Input name="donationAmount" type="number" label={`Amount (${paymentConfig.currency})`} value={amount} onChange={(event) => setAmount(event.target.value)} required />
           </div>
-          <Input name="donorName" label="Full Name" value={donor.name} onChange={(event) => setDonor((value) => ({ ...value, name: event.target.value }))} required />
-          <Input name="donorEmail" type="email" label="Email Address" value={donor.email} onChange={(event) => setDonor((value) => ({ ...value, email: event.target.value }))} required />
           {paymentError && <p className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700">{paymentError}</p>}
-          <PaystackButton
-            config={paymentConfig}
-            disabled={loading || !donor.email}
-            label={loading ? 'Processing...' : `Donate ${paymentConfig.currency} ${selectedAmount}`}
-            onClose={() => setPaymentError('Payment window closed before completion.')}
-            onFallback={startDemoPayment}
-            onSuccess={recordDonation}
-          />
-          {!paymentConfig.enabled && <p className="mt-3 rounded-lg bg-yellow-50 p-3 text-sm text-yellow-700">Paystack is not configured. This records a demo donation locally and posts to the backend when available.</p>}
+          <button type="button" disabled={loading || !donor.email || !donor.phone || !(selectedAmount > 0)} onClick={startMpesaPayment} className="w-full rounded-lg bg-green-600 px-5 py-3 font-semibold text-white shadow-lg shadow-green-600/20 transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60">
+            {loading ? 'Sending prompt...' : 'Pay with M-Pesa'}
+          </button>
+          <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">Enter your M-Pesa phone number, then complete the STK Push prompt on your phone.</p>
           <p className="mt-4 text-center text-xs text-gray-500"><Icon name="fa-lock" className="mr-1" />Secure payment processing via configured provider</p>
         </Modal>
       )}
@@ -359,6 +405,8 @@ export function DonationSection() {
               <p><strong>Program:</strong> {receipt.program}</p>
               <p><strong>Donor:</strong> {receipt.donorName || receipt.email || 'Donor'}</p>
               <p><strong>Date:</strong> {new Date(receipt.date).toLocaleString()}</p>
+              {receipt.paymentStatus && <p><strong>Status:</strong> {receipt.paymentStatus}</p>}
+              {receipt.mpesaMessage && <p className="mt-2 text-green-700"><strong>M-Pesa:</strong> {receipt.mpesaMessage}</p>}
               {receipt.syncStatus === 'failed' && <p className="mt-2 text-orange-700"><strong>Backend sync:</strong> Pending</p>}
             </div>
             <button onClick={() => window.print()} className="mr-3 rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-700"><Icon name="fa-print" className="mr-2" />Print Receipt</button>
@@ -470,8 +518,8 @@ export function GetInvolved({ navigate }) {
 
 export function PolicyContent({ type }) {
   const lines = type === 'annual-report'
-    ? ['Program efficiency remained above 90%.', 'Education, healthcare, and empowerment programs expanded across 48 communities.', 'This React dashboard keeps local demo records ready for export.']
-    : ['This React frontend keeps the original demo behavior while replacing DOM scripts with component state.', 'Form submissions are stored in browser localStorage for local preview.', 'Connect a backend or Google Apps Script endpoint when production persistence is ready.'];
+    ? ['WCDI continues to prioritize transparent, community-led impact across education, healthcare, women empowerment, nutrition, and child protection programs.', 'Program resources are directed toward practical support such as school supplies, mentorship, health outreach, food assistance, skills training, and family strengthening activities.', 'We track participation, donation records, volunteer activity, and program outcomes so supporters and partners can understand how their contributions are helping women, children, and families move forward.']
+    : ['Women and Children Development Initiative respects the privacy and dignity of every supporter, volunteer, donor, and community member who connects with us.', 'Information shared through contact, volunteer, newsletter, and donation forms is used only to respond to requests, coordinate programs, process support, and communicate relevant WCDI updates.', 'We protect submitted information with responsible access controls and do not sell personal data. Donors and subscribers may contact WCDI at any time to update their details or request removal from communication lists.'];
   return (
     <section className="bg-white py-16">
       <div className="container mx-auto max-w-4xl px-6">
