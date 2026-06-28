@@ -41,7 +41,7 @@ async function getAccessToken() {
   const response = await fetch(`${mpesaBaseUrl()}/oauth/v1/generate?grant_type=client_credentials`, {
     headers: { Authorization: `Basic ${credentials}` }
   });
-  const data = await response.json();
+  const data = await readProviderResponse(response, 'M-Pesa');
   if (!response.ok || !data.access_token) {
     const error = new Error(data.errorMessage || data.error_description || 'Unable to get M-Pesa access token.');
     error.status = response.status || 502;
@@ -88,7 +88,7 @@ export async function initiateMpesaStkPush(payload) {
     },
     body: JSON.stringify(body)
   });
-  const data = await response.json();
+  const data = await readProviderResponse(response, 'M-Pesa');
   if (!response.ok || data.errorCode) {
     const error = new Error(data.errorMessage || data.ResponseDescription || 'M-Pesa STK Push failed.');
     error.status = response.status || 502;
@@ -96,4 +96,19 @@ export async function initiateMpesaStkPush(payload) {
     throw error;
   }
   return data;
+}
+
+async function readProviderResponse(response, provider) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  return {
+    errorCode: 'NON_JSON_RESPONSE',
+    errorMessage: text.startsWith('<!DOCTYPE') || text.startsWith('<html')
+      ? `${provider} returned an HTML error page instead of JSON.`
+      : text || `${provider} returned an empty response.`
+  };
 }

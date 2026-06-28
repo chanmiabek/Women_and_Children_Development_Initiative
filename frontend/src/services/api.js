@@ -59,10 +59,11 @@ async function getJson(endpoint, token = '') {
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     }
   });
+  const data = await readResponseBody(response);
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    throw new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
   }
-  return response.json();
+  return data;
 }
 
 async function postJson(endpoint, payload) {
@@ -79,11 +80,7 @@ async function postJson(endpoint, payload) {
     body: JSON.stringify(payload)
   });
 
-  let data = null;
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    data = await response.json();
-  }
+  const data = await readResponseBody(response);
 
   if (!response.ok) {
     const message = data?.message || data?.error || `Request failed with status ${response.status}`;
@@ -91,4 +88,20 @@ async function postJson(endpoint, payload) {
   }
 
   return { ok: true, skipped: false, data };
+}
+
+async function readResponseBody(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  if (!text) return null;
+
+  return {
+    message: text.startsWith('<!DOCTYPE') || text.startsWith('<html')
+      ? 'The server returned an HTML error page instead of JSON. Please check the backend deployment logs.'
+      : text
+  };
 }

@@ -20,7 +20,7 @@ async function paystackFetch(path, options = {}) {
       ...(options.headers || {})
     }
   });
-  const data = await response.json();
+  const data = await readProviderResponse(response);
   if (!response.ok || data.status === false) {
     const error = new Error(data.message || 'Paystack request failed.');
     error.status = response.status || 502;
@@ -28,6 +28,21 @@ async function paystackFetch(path, options = {}) {
     throw error;
   }
   return data;
+}
+
+async function readProviderResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  return {
+    status: false,
+    message: text.startsWith('<!DOCTYPE') || text.startsWith('<html')
+      ? 'Paystack returned an HTML error page instead of JSON.'
+      : text || 'Paystack returned an empty response.'
+  };
 }
 
 export async function initializePaystackPayment(payload) {
