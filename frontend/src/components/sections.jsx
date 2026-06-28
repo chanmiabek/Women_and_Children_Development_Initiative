@@ -342,7 +342,30 @@ export function DonationSection() {
     setPaymentError('');
     if (!paystackPaymentPageUrl) {
       setPaymentError('Add VITE_PAYSTACK_PAYMENT_PAGE_URL to frontend/.env to let donors enter amount on Paystack.');
+      return;
     }
+
+    const width = 480;
+    const height = 760;
+    const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
+    const top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
+    const popup = window.open(
+      paystackPaymentPageUrl,
+      'paystack_payment',
+      `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+    );
+
+    if (popup) {
+      popup.focus();
+      try {
+        popup.opener = null;
+      } catch {
+        // Some browsers do not allow changing opener after creating the popup.
+      }
+      return;
+    }
+
+    setPaymentError('Your browser blocked the Paystack popup. Allow popups for this site, then click Paystack again.');
   };
 
   const startDemoPayment = () => {
@@ -362,27 +385,23 @@ export function DonationSection() {
       <SectionTitle eyebrow="Make a Difference Today" title="Your Donation Changes Lives" text="Every contribution, no matter the size, helps us reach more women and children in need." />
       <div className="container mx-auto px-6">
         <div className="aos-lite mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
-          <a
-            href={paystackPaymentPageUrl || undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(event) => {
-              if (!paystackPaymentPageUrl) {
-                event.preventDefault();
-                openPaystackPaymentPage();
-              } else {
-                setPaymentError('');
-              }
-            }}
-            className="rounded-lg border-2 border-white bg-white px-8 py-5 text-center text-xl font-bold text-[#00A9D6] shadow-xl transition hover:scale-[1.01] hover:bg-sky-50"
-          >
+          <button type="button" onClick={openPaystackPaymentPage} className="rounded-lg border-2 border-white bg-white px-8 py-5 text-center text-xl font-bold text-[#00A9D6] shadow-xl transition hover:scale-[1.01] hover:bg-sky-50">
             <Icon name="fa-credit-card" className="mr-3" />Paystack
-          </a>
+          </button>
           <button type="button" onClick={() => openPayment('mpesa')} disabled={!mpesaEnabled} className="rounded-lg border-2 border-white bg-white px-8 py-5 text-xl font-bold text-green-700 shadow-xl transition hover:scale-[1.01] hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60">
             <Icon name="fa-mobile-screen" className="mr-3" />M-Pesa
           </button>
         </div>
-        {paymentError && <p className="mx-auto mt-4 max-w-3xl rounded-lg bg-white/95 p-3 text-sm text-red-700">{paymentError}</p>}
+        {paymentError && (
+          <p className="mx-auto mt-4 max-w-3xl rounded-lg bg-white/95 p-3 text-sm text-red-700">
+            {paymentError}
+            {paystackPaymentPageUrl && paymentError.includes('blocked') && (
+              <a href={paystackPaymentPageUrl} target="_blank" rel="noopener noreferrer" className="ml-2 font-semibold underline">
+                Open Paystack
+              </a>
+            )}
+          </p>
+        )}
       </div>
       {paymentOpen && (
         <Modal onClose={() => setPaymentOpen(false)}>
