@@ -342,11 +342,6 @@ export function DonationSection() {
     setPaymentError('');
     if (!paystackPaymentPageUrl) {
       setPaymentError('Add VITE_PAYSTACK_PAYMENT_PAGE_URL to frontend/.env to let donors enter amount on Paystack.');
-      return;
-    }
-    const popup = window.open(paystackPaymentPageUrl, 'paystack_payment', 'width=760,height=760,noopener,noreferrer');
-    if (!popup) {
-      setPaymentError('Allow popups for this site to open the Paystack payment page.');
     }
   };
 
@@ -367,9 +362,22 @@ export function DonationSection() {
       <SectionTitle eyebrow="Make a Difference Today" title="Your Donation Changes Lives" text="Every contribution, no matter the size, helps us reach more women and children in need." />
       <div className="container mx-auto px-6">
         <div className="aos-lite mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
-          <button type="button" onClick={openPaystackPaymentPage} className="rounded-lg border-2 border-white bg-white px-8 py-5 text-xl font-bold text-[#00A9D6] shadow-xl transition hover:scale-[1.01] hover:bg-sky-50">
+          <a
+            href={paystackPaymentPageUrl || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(event) => {
+              if (!paystackPaymentPageUrl) {
+                event.preventDefault();
+                openPaystackPaymentPage();
+              } else {
+                setPaymentError('');
+              }
+            }}
+            className="rounded-lg border-2 border-white bg-white px-8 py-5 text-center text-xl font-bold text-[#00A9D6] shadow-xl transition hover:scale-[1.01] hover:bg-sky-50"
+          >
             <Icon name="fa-credit-card" className="mr-3" />Paystack
-          </button>
+          </a>
           <button type="button" onClick={() => openPayment('mpesa')} disabled={!mpesaEnabled} className="rounded-lg border-2 border-white bg-white px-8 py-5 text-xl font-bold text-green-700 shadow-xl transition hover:scale-[1.01] hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60">
             <Icon name="fa-mobile-screen" className="mr-3" />M-Pesa
           </button>

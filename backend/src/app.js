@@ -20,6 +20,7 @@ export function createApp() {
   app.use(helmet());
   app.use(cors({
     origin(origin, callback) {
+      if (config.allowAllCorsOrigins) return callback(null, true);
       if (!origin || config.corsOrigins.includes(origin)) return callback(null, true);
       return callback(new Error(`CORS blocked origin: ${origin}`));
     }

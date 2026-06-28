@@ -16,6 +16,7 @@ export const config = {
   port: Number(process.env.PORT || 5000),
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigins: readOrigins(process.env.CORS_ORIGIN),
+  allowAllCorsOrigins: readOrigins(process.env.CORS_ORIGIN).includes('*'),
   adminApiToken: process.env.ADMIN_API_TOKEN || '',
   admin: {
     username: process.env.ADMIN_USERNAME || 'admin',
