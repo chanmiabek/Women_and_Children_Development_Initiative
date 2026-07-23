@@ -114,7 +114,7 @@ function Footer({ navigate }) {
         <div className="border-t border-gray-800 pt-8 text-sm text-gray-400 md:flex md:items-center md:justify-between">
 
           <p>&copy; 2026, Women and Children Development Initiative(WCDI). All rights reserved.</p>
-          <p className="mt-2 md:mt-0">Registered Charity #: 88-1234567 | EIN: 12-3456789</p>
+          <p className="mt-2 md:mt-0">Terms| Privacy</p>
         </div>
       </div>
     </footer>
@@ -144,4 +144,5 @@ function CookieConsent() {
       <div className="flex gap-3"><Icon name="fa-cookie-bite" className="mt-1 text-orange-400" /><div><p className="font-semibold">Cookie notice</p><p className="mt-1 text-sm text-gray-300">We use essential browser storage to remember preferences and save demo form submissions on this device.</p><div className="mt-3 flex gap-2"><button onClick={() => choose('accepted')} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold hover:bg-orange-700">Accept</button><button onClick={() => choose('declined')} className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-semibold hover:bg-gray-600">Decline</button></div></div></div>
     </div>
   );
+
 }

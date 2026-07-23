@@ -13,7 +13,7 @@ import youthImage from '../../assets/images/youth.jpeg';
 export function GenericPage({ type, navigate }) {
   const cms = useCmsContent();
   const config = {
-    about: ['About WCDI', 'Making a difference since 2010 through sustainable women and children development programs.', 'fa-hands-helping'],
+    about: ['About WCDI', 'Making a difference since 2018 through sustainable women and children development programs.', 'fa-hands-helping'],
     programs: ['Our Programs', 'Explore the core initiatives creating lasting community change.', 'fa-layer-group'],
     'get-involved': ['Get Involved', 'Support through donations, volunteering, partnerships, advocacy, and events.', 'fa-people-carry'],
     events: ['Events', 'Join upcoming trainings, drives, summits, and community health days.', 'fa-calendar-alt'],
@@ -22,7 +22,7 @@ export function GenericPage({ type, navigate }) {
     'annual-report': ['Annual Report 2026', 'A transparent overview of impact, finance, and program outcomes.', 'fa-file-alt'],
     'blog-single': ['Volunteer Spotlight', 'A closer look at community members helping WCDI programs thrive.', 'fa-user-friends'],
     'privacy-policy': ['Privacy Policy', 'How WCDI handles essential browser storage and submitted demo data.', 'fa-lock'],
-    terms: ['Terms of Use', 'Guidelines for using the WCDI website and demo tools.', 'fa-file-contract']
+    terms: ['Terms of Use', 'Guidelines for using the WCDI website.', 'fa-file-contract']
   }[type] || ['WCDI', 'Women and Children Development Initiative', 'fa-hands-helping'];
   const editablePage = cms.pages[type];
   const backgroundImage = {
