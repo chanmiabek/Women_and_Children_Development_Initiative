@@ -422,7 +422,7 @@ function AdminImageInput({ label, value, onChange, onUpload, className = '' }) {
         </label>
         {value && <button type="button" onClick={() => onChange('')} className="rounded-lg border border-red-300 px-4 py-3 text-sm font-semibold text-red-700 hover:bg-red-50"><Icon name="fa-trash" className="mr-2" />Remove</button>}
       </div>
-      <p className="mt-2 text-xs text-gray-500">Images upload securely to Cloudinary and are published with your CMS changes.</p>
+      <p className="mt-2 text-xs text-gray-500">Images up to 10 MB upload securely to Cloudinary and are published with your CMS changes.</p>
     </div>
   );
 }
