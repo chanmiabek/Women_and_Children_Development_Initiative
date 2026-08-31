@@ -20,7 +20,15 @@ function getCloudinary() {
 export function uploadImage(file) {
   return new Promise((resolve, reject) => {
     const stream = getCloudinary().uploader.upload_stream({ folder: 'wcdi/website', resource_type: 'image' }, (error, result) => {
-      if (error) return reject(error);
+      if (error) {
+        const uploadError = new Error(error.message || 'Cloudinary image upload failed.');
+        uploadError.status = error.http_code || 502;
+        uploadError.details = {
+          provider: 'cloudinary',
+          code: error.code || undefined
+        };
+        return reject(uploadError);
+      }
       resolve({ secure_url: result.secure_url, public_id: result.public_id, width: result.width, height: result.height });
     });
     stream.end(file.buffer);
