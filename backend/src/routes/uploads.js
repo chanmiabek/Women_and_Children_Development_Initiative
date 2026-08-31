@@ -6,7 +6,7 @@ import { uploadImage } from '../services/cloudinaryService.js';
 export const uploadsRouter = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
     if (file.mimetype.startsWith('image/')) return callback(null, true);
     const error = new Error('Only image files are allowed.');
