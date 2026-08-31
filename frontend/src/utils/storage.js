@@ -1,6 +1,7 @@
 export function readJson(key, fallback = []) {
   try {
-    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+    const value = JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+    return Array.isArray(fallback) ? (Array.isArray(value) ? value : fallback) : value;
   } catch {
     return fallback;
   }
@@ -12,7 +13,13 @@ export function writeJson(key, value) {
 
 export function saveSubmission(type, data) {
   const key = `${type}_submissions`;
-  writeJson(key, [...readJson(key), { ...data, timestamp: new Date().toISOString() }]);
+  const localId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  writeJson(key, [...readJson(key), { ...data, localId, timestamp: new Date().toISOString() }]);
+}
+
+export function removeSubmission(type, submission) {
+  const key = `${type}_submissions`;
+  writeJson(key, readJson(key).filter((item) => item.localId !== submission.localId));
 }
 
 export function normalizeSubscriberEmail(item) {
@@ -21,8 +28,8 @@ export function normalizeSubscriberEmail(item) {
 
 export function saveSubscriber(email) {
   const subscribers = readJson('newsletter_subscribers');
-  const known = subscribers.map(normalizeSubscriberEmail).filter(Boolean);
-  if (!known.includes(email)) {
+  const known = subscribers.map(normalizeSubscriberEmail).filter(Boolean).map((value) => value.toLowerCase());
+  if (!known.includes(email.toLowerCase())) {
     writeJson('newsletter_subscribers', [...subscribers, email]);
   }
 }

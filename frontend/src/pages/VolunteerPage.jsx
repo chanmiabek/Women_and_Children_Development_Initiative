@@ -23,8 +23,12 @@ export function VolunteerPage() {
       setSelected([]);
       setStatus({ type: 'success', text: "Thank you for applying to volunteer! We'll contact you soon." });
     } catch (error) {
-      saveSubmission('volunteer', { ...data, syncStatus: 'failed', syncError: error.message });
-      setStatus({ type: 'error', text: 'Application saved locally, but the backend could not be reached.' });
+      if (!error.status || error.status >= 500) {
+        saveSubmission('volunteer', { ...data, syncStatus: 'failed', syncError: error.message });
+        setStatus({ type: 'error', text: 'Application saved locally, but the backend could not be reached.' });
+      } else {
+        setStatus({ type: 'error', text: error.message || 'Please check the form and try again.' });
+      }
     } finally {
       setLoading(false);
     }

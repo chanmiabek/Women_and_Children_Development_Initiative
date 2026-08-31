@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateAdmin } from '../services/authService.js';
+import { config } from '../config.js';
 import { cleanText } from '../utils/validation.js';
 
 export const authRouter = Router();
@@ -20,7 +21,8 @@ authRouter.post('/auth/login', async (req, res, next) => {
       data: {
         token,
         username,
-        expiresInHours: Number(process.env.ADMIN_SESSION_HOURS || 8)
+        expiresInHours: config.admin.sessionHours,
+        expiresAt: new Date(Date.now() + config.admin.sessionHours * 60 * 60 * 1000).toISOString()
       }
     });
   } catch (error) {

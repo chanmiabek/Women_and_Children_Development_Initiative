@@ -8,7 +8,6 @@ const initialState = {
   volunteers: [],
   newsletter: [],
   subscribers: [],
-  donations: [],
   content: null
 };
 
@@ -30,12 +29,15 @@ async function readState() {
   return { ...initialState, ...parsed };
 }
 
-async function writeState(nextState) {
-  writeQueue = writeQueue.then(async () => {
-    await ensureStoreFile();
-    await fs.writeFile(config.dataFile, JSON.stringify(nextState, null, 2));
+async function updateState(mutator) {
+  let result;
+  writeQueue = writeQueue.catch(() => undefined).then(async () => {
+    const state = await readState();
+    result = await mutator(state);
+    await fs.writeFile(config.dataFile, JSON.stringify(state, null, 2));
   });
-  return writeQueue;
+  await writeQueue;
+  return result;
 }
 
 export async function list(collection) {
@@ -44,53 +46,53 @@ export async function list(collection) {
 }
 
 export async function insert(collection, payload) {
-  const state = await readState();
-  const item = {
-    id: randomUUID(),
-    ...payload,
-    timestamp: payload.timestamp || payload.date || new Date().toISOString()
-  };
-  state[collection] = [...(Array.isArray(state[collection]) ? state[collection] : []), item];
-  await writeState(state);
-  return item;
+  return updateState((state) => {
+    const item = {
+      id: randomUUID(),
+      ...payload,
+      timestamp: payload.timestamp || payload.date || new Date().toISOString()
+    };
+    state[collection] = [...(Array.isArray(state[collection]) ? state[collection] : []), item];
+    return item;
+  });
 }
 
 export async function updateFirst(collection, predicate, changes) {
-  const state = await readState();
-  const items = Array.isArray(state[collection]) ? state[collection] : [];
-  const index = items.findIndex(predicate);
-  if (index === -1) return null;
+  return updateState((state) => {
+    const items = Array.isArray(state[collection]) ? state[collection] : [];
+    const index = items.findIndex(predicate);
+    if (index === -1) return null;
 
-  items[index] = {
-    ...items[index],
-    ...changes,
-    updatedAt: new Date().toISOString()
-  };
-  state[collection] = items;
-  await writeState(state);
-  return items[index];
+    items[index] = {
+      ...items[index],
+      ...changes,
+      updatedAt: new Date().toISOString()
+    };
+    state[collection] = items;
+    return items[index];
+  });
 }
 
 export async function upsertSubscriber(email, payload = {}) {
-  const state = await readState();
-  const normalizedEmail = email.toLowerCase();
-  const current = Array.isArray(state.subscribers) ? state.subscribers : [];
-  const existing = current.find((item) => item.email?.toLowerCase() === normalizedEmail);
+  return updateState((state) => {
+    const normalizedEmail = email.toLowerCase();
+    const current = Array.isArray(state.subscribers) ? state.subscribers : [];
+    const existing = current.find((item) => item.email?.toLowerCase() === normalizedEmail);
 
-  if (existing) {
-    Object.assign(existing, payload, { email, updatedAt: new Date().toISOString() });
-  } else {
-    current.push({
-      id: randomUUID(),
-      email,
-      ...payload,
-      subscribedAt: payload.subscribedAt || new Date().toISOString()
-    });
-  }
+    if (existing) {
+      Object.assign(existing, payload, { email, updatedAt: new Date().toISOString() });
+    } else {
+      current.push({
+        id: randomUUID(),
+        email,
+        ...payload,
+        subscribedAt: payload.subscribedAt || new Date().toISOString()
+      });
+    }
 
-  state.subscribers = current;
-  await writeState(state);
-  return state.subscribers.find((item) => item.email?.toLowerCase() === normalizedEmail);
+    state.subscribers = current;
+    return state.subscribers.find((item) => item.email?.toLowerCase() === normalizedEmail);
+  });
 }
 
 export async function readDashboard() {
@@ -100,7 +102,6 @@ export async function readDashboard() {
     volunteers: state.volunteers || [],
     newsletter: state.newsletter || [],
     subscribers: state.subscribers || [],
-    donations: state.donations || []
   };
 }
 
@@ -110,11 +111,12 @@ export async function readContent() {
 }
 
 export async function writeContent(content) {
-  const state = await readState();
-  state.content = {
-    ...content,
-    updatedAt: new Date().toISOString()
-  };
-  await writeState(state);
-  return state.content;
+  return updateState((state) => {
+    state.content = {
+      ...(state.content || {}),
+      ...content,
+      updatedAt: new Date().toISOString()
+    };
+    return state.content;
+  });
 }

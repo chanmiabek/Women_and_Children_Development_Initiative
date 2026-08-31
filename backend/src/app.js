@@ -7,10 +7,9 @@ import { config } from './config.js';
 import { authRouter } from './routes/auth.js';
 import { contentRouter } from './routes/content.js';
 import { dashboardRouter } from './routes/dashboard.js';
-import { donationsRouter } from './routes/donations.js';
 import { newsletterRouter } from './routes/newsletter.js';
-import { paymentsRouter } from './routes/payments.js';
 import { submissionsRouter } from './routes/submissions.js';
+import { uploadsRouter } from './routes/uploads.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -45,14 +44,10 @@ export function createApp() {
         'POST /contact',
         'POST /volunteers',
         'POST /newsletter',
-        'POST /donations',
-        'POST /payments/paystack/initialize',
-        'GET /payments/paystack/verify/:reference',
-        'POST /payments/mpesa/stk-push',
-        'POST /payments/mpesa/callback',
         'GET /dashboard',
         'GET /content',
-        'PUT /content'
+        'PUT /content',
+        'POST /uploads/image'
       ]
     });
   });
@@ -69,10 +64,9 @@ export function createApp() {
   app.use(authRouter);
   app.use(submissionsRouter);
   app.use(newsletterRouter);
-  app.use(donationsRouter);
-  app.use(paymentsRouter);
   app.use(dashboardRouter);
   app.use(contentRouter);
+  app.use(uploadsRouter);
   app.use(notFound);
   app.use(errorHandler);
 

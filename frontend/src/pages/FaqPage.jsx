@@ -5,7 +5,7 @@ export function FaqPage() {
   const items = [
     ['How are donations used?', 'Most donations go directly to education, healthcare, empowerment, water, and nutrition programs.'],
     ['Can I volunteer remotely?', 'Yes. Remote volunteers can help with mentoring, translation, communications, research, and fundraising.'],
-    ['Will I receive a donation receipt?', 'Yes. The demo payment flow generates a printable receipt and stores the transaction locally.'],
+    ['Will I receive a donation receipt?', 'Donorbox provides donation confirmations and receipts after a successful gift.'],
     ['How do I partner with WCDI?', 'Use the contact page to share your organization, goals, and preferred collaboration area.']
   ];
   const [open, setOpen] = useState(0);

@@ -11,12 +11,15 @@ function readOrigins(value) {
   return value.split(',').map((origin) => origin.trim()).filter(Boolean);
 }
 
+const configuredCorsOrigin = process.env.CORS_ORIGIN || '';
+const nodeEnv = process.env.NODE_ENV || 'development';
+
 export const config = {
   rootDir,
   port: Number(process.env.PORT || 5000),
-  nodeEnv: process.env.NODE_ENV || 'development',
-  corsOrigins: readOrigins(process.env.CORS_ORIGIN),
-  allowAllCorsOrigins: readOrigins(process.env.CORS_ORIGIN).includes('*'),
+  nodeEnv,
+  corsOrigins: configuredCorsOrigin ? readOrigins(configuredCorsOrigin) : (nodeEnv === 'production' ? ['*'] : readOrigins('')),
+  allowAllCorsOrigins: configuredCorsOrigin.includes('*') || (!configuredCorsOrigin && nodeEnv === 'production'),
   adminApiToken: process.env.ADMIN_API_TOKEN || '',
   admin: {
     username: process.env.ADMIN_USERNAME || 'admin',
@@ -36,20 +39,5 @@ export const config = {
     from: process.env.MAIL_FROM || process.env.SMTP_USER || 'no-reply@wcdi.local',
     adminTo: process.env.ADMIN_EMAIL || ''
   },
-  paystack: {
-    secretKey: process.env.PAYSTACK_SECRET_KEY || '',
-    publicKey: process.env.PAYSTACK_PUBLIC_KEY || '',
-    callbackUrl: process.env.PAYSTACK_CALLBACK_URL || ''
-  },
-  mpesa: {
-    environment: process.env.MPESA_ENVIRONMENT || 'sandbox',
-    consumerKey: process.env.MPESA_CONSUMER_KEY || '',
-    consumerSecret: process.env.MPESA_CONSUMER_SECRET || '',
-    shortcode: process.env.MPESA_SHORTCODE || '',
-    passkey: process.env.MPESA_PASSKEY || '',
-    transactionType: process.env.MPESA_TRANSACTION_TYPE || 'CustomerPayBillOnline',
-    callbackUrl: process.env.MPESA_CALLBACK_URL || '',
-    accountReference: process.env.MPESA_ACCOUNT_REFERENCE || 'WCDI',
-    transactionDescription: process.env.MPESA_TRANSACTION_DESCRIPTION || 'WCDI Donation'
-  }
+  cloudinaryUrl: process.env.CLOUDINARY_URL || ''
 };
