@@ -1,14 +1,13 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://wcdi-api.onrender.com').trim().replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:5000' : 'https://wcdi-api.onrender.com')).trim().replace(/\/$/, '');
 
 const ENDPOINTS = {
   login: '/auth/login',
   contact: '/contact',
   volunteer: '/volunteers',
   newsletter: '/newsletter',
-  donation: '/donations',
   dashboard: '/dashboard',
-  paystackVerify: '/payments/paystack/verify',
-  mpesaStkPush: '/payments/mpesa/stk-push'
+  content: '/content',
+  uploadImage: '/uploads/image',
 };
 
 export function hasBackend() {
@@ -32,23 +31,48 @@ export async function submitNewsletter(payload) {
   return postJson(ENDPOINTS.newsletter, payload);
 }
 
-export async function submitDonation(payload) {
-  return postJson(ENDPOINTS.donation, payload);
-}
-
-export async function verifyPaystackPayment(reference) {
-  const response = await getJson(`${ENDPOINTS.paystackVerify}/${encodeURIComponent(reference)}`);
-  return response;
-}
-
-export async function initiateMpesaPayment(payload) {
-  const response = await postJson(ENDPOINTS.mpesaStkPush, payload);
-  return response.data;
-}
-
 export async function fetchDashboard(token = '') {
   if (!hasBackend()) return null;
   return getJson(ENDPOINTS.dashboard, token);
+}
+
+export async function fetchContent() {
+  if (!hasBackend()) return null;
+  const response = await getJson(ENDPOINTS.content);
+  return response.data || null;
+}
+
+export async function saveContent(content, token = '') {
+  if (!hasBackend()) return content;
+  const response = await fetch(`${API_BASE_URL}${ENDPOINTS.content}`, {
+    method: 'PUT',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(content)
+  });
+  const data = await readResponseBody(response);
+  if (!response.ok) {
+    const error = new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return data.data;
+}
+
+export async function uploadImage(file, token = '') {
+  const formData = new FormData();
+  formData.append('image', file);
+  const response = await fetch(`${API_BASE_URL}${ENDPOINTS.uploadImage}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    body: formData
+  });
+  const data = await readResponseBody(response);
+  if (!response.ok) {
+    const error = new Error(data?.message || data?.error || 'Image upload failed.');
+    error.status = response.status;
+    throw error;
+  }
+  return data.data;
 }
 
 async function getJson(endpoint, token = '') {
@@ -61,7 +85,9 @@ async function getJson(endpoint, token = '') {
   });
   const data = await readResponseBody(response);
   if (!response.ok) {
-    throw new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
+    const error = new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
   return data;
 }
@@ -71,20 +97,27 @@ async function postJson(endpoint, payload) {
     return { ok: false, skipped: true, data: null };
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    throw new Error(`Cannot connect to the backend at ${API_BASE_URL}. Start the backend or check VITE_API_BASE_URL.`);
+  }
 
   const data = await readResponseBody(response);
 
   if (!response.ok) {
     const message = data?.message || data?.error || `Request failed with status ${response.status}`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return { ok: true, skipped: false, data };

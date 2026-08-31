@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { featuredImages, galleryImages } from '../data/siteData.js';
-import { initiateMpesaPayment, submitDonation, submitNewsletter, verifyPaystackPayment } from '../services/api.js';
+import { submitNewsletter } from '../services/api.js';
 import { useCmsContent } from '../hooks/useCmsContent.js';
-import { usePaymentConfig } from '../hooks/usePayment.js';
-import { readJson, saveSubscriber, saveSubmission, writeJson } from '../utils/storage.js';
+import { saveSubscriber, saveSubmission } from '../utils/storage.js';
 import { Counter, Icon, Input, LinkButton, Modal, SectionTitle } from './ui.jsx';
 
 export function Hero({ navigate }) {
@@ -99,9 +98,10 @@ export function AboutSection() {
 
 export function ProgramsSection({ navigate }) {
   const cms = useCmsContent();
+  const page = cms.pages.programs;
   return (
     <section id="programs" className="bg-white py-20">
-      <SectionTitle eyebrow={cms.pages.programs.eyebrow} title="Our Core Programs" text="Comprehensive initiatives designed to create sustainable change" />
+      <SectionTitle eyebrow={page.eyebrow} title={page.title} text={page.text} />
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-2 lg:grid-cols-3">
         {cms.programs.map((program) => (
           <div key={program.title} className="aos-lite hover-lift overflow-hidden rounded-xl bg-white shadow-lg">
@@ -170,8 +170,8 @@ export function TeamSection() {
     <section className="bg-gray-50 py-20">
       <SectionTitle eyebrow="Our Team" title="People Behind the Mission" text="Meet the team coordinating WCDI programs, partnerships, and community outreach." />
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-2 lg:grid-cols-3">
-        {cms.team.map((member) => (
-          <article key={member.name} className="aos-lite hover-lift overflow-hidden rounded-xl bg-white shadow-lg">
+        {cms.team.map((member, index) => (
+          <article key={`${member.name}-${index}`} className="aos-lite hover-lift overflow-hidden rounded-xl bg-white shadow-lg">
             <div className="h-72 bg-gray-100">
               <img src={member.image} alt={member.name} className="h-full w-full object-cover object-top" />
             </div>
@@ -194,8 +194,8 @@ export function TestimonialsSection() {
     <section className="bg-white py-20">
       <SectionTitle eyebrow="Testimonials" title="What People Say" text="Stories from families, volunteers, and partners connected to WCDI programs." />
       <div className="container mx-auto grid gap-8 px-6 lg:grid-cols-3">
-        {cms.testimonials.map((item) => (
-          <article key={item.name} className="aos-lite rounded-xl bg-gray-50 p-8 shadow">
+        {cms.testimonials.map((item, index) => (
+          <article key={`${item.name}-${index}`} className="aos-lite rounded-xl bg-gray-50 p-8 shadow">
             <Icon name="fa-quote-left" className="mb-5 text-4xl text-orange-500" />
             <p className="text-lg leading-relaxed text-gray-700">"{item.quote}"</p>
             <div className="mt-6 flex items-center gap-4">
@@ -214,238 +214,30 @@ export function TestimonialsSection() {
 }
 
 export function DonationSection() {
-  const defaultAmount = Number(import.meta.env.VITE_DEFAULT_DONATION_AMOUNT || 200);
-  const defaultEmail = import.meta.env.VITE_DEFAULT_DONOR_EMAIL || 'donor@wcdi.org';
-  const [amount, setAmount] = useState(defaultAmount);
-  const [program, setProgram] = useState('general');
-  const [recurring, setRecurring] = useState(false);
-  const [paymentOpen, setPaymentOpen] = useState(false);
-  const [paystackOpen, setPaystackOpen] = useState(false);
-  const [receipt, setReceipt] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [donor, setDonor] = useState({ name: '', email: defaultEmail, phone: '' });
-  const [paymentError, setPaymentError] = useState('');
-  const [reference, setReference] = useState(() => `WCDI_${Date.now()}`);
-  const [provider, setProvider] = useState('');
-  const selectedAmount = amount;
-  const paymentConfig = usePaymentConfig({ amount: selectedAmount, email: donor.email, reference });
-  const mpesaEnabled = import.meta.env.VITE_ENABLE_MPESA !== 'false';
-  const paystackPaymentPageUrl = import.meta.env.VITE_PAYSTACK_PAYMENT_PAGE_URL || '';
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paystackReference = params.get('reference') || params.get('trxref');
-    if (!paystackReference) return;
-
-    let active = true;
-    verifyPaystackPayment(paystackReference)
-      .then((verification) => {
-        if (!active) return;
-        const savedReceipt = JSON.parse(localStorage.getItem('last_receipt') || 'null');
-        const verifiedReceipt = {
-          ...(savedReceipt || {}),
-          transactionId: paystackReference,
-          paymentProvider: 'paystack',
-          paymentStatus: verification.data?.status || 'paid',
-          providerResponse: verification,
-          date: savedReceipt?.date || new Date().toISOString()
-        };
-        storeReceipt(verifiedReceipt);
-        window.history.replaceState({}, '', window.location.pathname);
-      })
-      .catch((error) => {
-        if (!active) return;
-        setPaymentError(error.message);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const buildReceipt = (paymentReference = {}, paymentProvider = provider) => ({
-    transactionId: paymentReference.reference || paymentReference.trxref || paymentReference.transactionId || reference,
-    amount: selectedAmount,
-    program,
-    recurring,
-    donorName: donor.name,
-    email: donor.email,
-    phone: donor.phone,
-    currency: paymentConfig.currency,
-    paymentProvider,
-    date: new Date().toISOString(),
-    providerResponse: paymentReference
-  });
-
-  const storeReceipt = (nextReceipt) => {
-    writeJson('donations', [...readJson('donations'), nextReceipt]);
-    localStorage.setItem('last_receipt', JSON.stringify(nextReceipt));
-    setPaymentOpen(false);
-    setReceipt(nextReceipt);
-  };
-
-  const recordDonation = async (paymentReference = {}, paymentProvider = provider) => {
-    setLoading(true);
-    setPaymentError('');
-    const nextReceipt = buildReceipt(paymentReference, paymentProvider);
-    try {
-      await submitDonation(nextReceipt);
-      storeReceipt(nextReceipt);
-    } catch (error) {
-      storeReceipt({ ...nextReceipt, syncStatus: 'failed', syncError: error.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startMpesaPayment = async () => {
-    if (!donor.email || !donor.phone) {
-      setPaymentError('Please enter your email and M-Pesa phone number before continuing.');
-      return;
-    }
-    if (!(selectedAmount > 0)) {
-      setPaymentError('Please enter a donation amount.');
-      return;
-    }
-    setLoading(true);
-    setPaymentError('');
-    const nextReceipt = buildReceipt({ reference }, 'mpesa');
-    try {
-      const response = await initiateMpesaPayment({
-        ...nextReceipt,
-        reference,
-        phone: donor.phone
-      });
-      storeReceipt({
-        ...nextReceipt,
-        paymentStatus: 'pending',
-        checkoutRequestId: response.data?.mpesa?.CheckoutRequestID,
-        providerResponse: response,
-        mpesaMessage: 'STK Push sent. Complete the payment prompt on your phone.'
-      });
-    } catch (error) {
-      setPaymentError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openPayment = (method) => {
-    setDonor({ name: '', email: defaultEmail, phone: '' });
-    setAmount(defaultAmount);
-    setPaymentError('');
-    setProvider(method);
-    setReference(`WCDI_${Date.now()}`);
-    setPaymentOpen(true);
-  };
-
-  const openPaystackCard = () => {
-    setPaymentError('');
-    if (!paystackPaymentPageUrl) {
-      setPaymentError('Add VITE_PAYSTACK_PAYMENT_PAGE_URL to frontend/.env to show the Paystack donation form.');
-      return;
-    }
-    setPaystackOpen(true);
-  };
-
-  const openPaystackBrowserPopup = () => {
-    setPaymentError('');
-    if (!paystackPaymentPageUrl) {
-      setPaymentError('Add VITE_PAYSTACK_PAYMENT_PAGE_URL to frontend/.env to show the Paystack donation form.');
-      return;
-    }
-    const width = 520;
-    const height = 760;
-    const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
-    const top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
-    const popup = window.open(
-      paystackPaymentPageUrl,
-      'paystack_payment',
-      `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-    );
-    if (popup) popup.focus();
-  };
-
   return (
-    <section id="donate" className="bg-gradient-to-r from-orange-600 to-red-600 py-20 text-white">
-      <SectionTitle eyebrow="Make a Difference Today" title="Your Donation Changes Lives" text="Every contribution, no matter the size, helps us reach more women and children in need." />
+    <section id="donate" className="bg-gradient-to-br from-orange-700 via-orange-600 to-rose-700 py-20 text-white">
+      <SectionTitle eyebrow="Make a Difference Today" title="Your Donation Changes Lives" text="Your support helps women, children, and families access practical, lasting opportunities." />
       <div className="container mx-auto px-6">
-        <div className="aos-lite mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
-          <button type="button" onClick={openPaystackCard} className="rounded-lg border-2 border-white bg-white px-8 py-5 text-center text-xl font-bold text-[#00A9D6] shadow-xl transition hover:scale-[1.01] hover:bg-sky-50">
-            <Icon name="fa-credit-card" className="mr-3" />Paystack
-          </button>
-          <button type="button" onClick={() => openPayment('mpesa')} disabled={!mpesaEnabled} className="rounded-lg border-2 border-white bg-white px-8 py-5 text-xl font-bold text-green-700 shadow-xl transition hover:scale-[1.01] hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60">
-            <Icon name="fa-mobile-screen" className="mr-3" />M-Pesa
-          </button>
+        <div className="mx-auto grid max-w-5xl overflow-hidden rounded-3xl bg-white text-gray-900 shadow-2xl lg:grid-cols-[.85fr_1.15fr]">
+          <div className="bg-gray-950 p-8 text-white sm:p-10">
+            <p className="mb-3 text-sm font-bold uppercase tracking-[.2em] text-orange-300">Your impact</p>
+            <h3 className="text-3xl font-bold leading-tight">Small gifts create lasting change.</h3>
+            <p className="mt-5 leading-relaxed text-gray-300">Your contribution helps WCDI expand education, protection, healthcare, and economic opportunities for women and children.</p>
+            <div className="mt-8 space-y-4 text-sm text-gray-200">
+              <p><Icon name="fa-circle-check" className="mr-3 text-orange-400" />Secure donation processing by Donorbox</p>
+              <p><Icon name="fa-circle-check" className="mr-3 text-orange-400" />One-time and recurring giving</p>
+              <p><Icon name="fa-circle-check" className="mr-3 text-orange-400" />Every gift supports community-led work</p>
+            </div>
+          </div>
+          <div className="p-4 sm:p-8">
+            <div className="mb-6 flex items-start gap-4 rounded-2xl bg-orange-50 p-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white"><Icon name="fa-heart" /></div>
+              <div><h3 className="text-xl font-bold">Make your donation</h3><p className="mt-1 text-sm leading-relaxed text-gray-600">Donorbox securely processes your gift.</p></div>
+            </div>
+            <iframe src="https://donorbox.org/embed/your-donation-helps-us-run-our-programs" title="Donate to Women and Children Development Initiative" className="h-[760px] w-full rounded-xl border-0 bg-white" loading="eager" allow="payment" />
+          </div>
         </div>
-        {paymentError && <p className="mx-auto mt-4 max-w-3xl rounded-lg bg-white/95 p-3 text-sm text-red-700">{paymentError}</p>}
       </div>
-      {paystackOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-3 sm:p-6">
-          <div className="flex h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white text-gray-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <div>
-                <h3 className="text-lg font-bold">Paystack Donation</h3>
-                <p className="text-sm text-gray-500">Complete your donation securely without leaving this page.</p>
-              </div>
-              <button type="button" onClick={() => setPaystackOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full text-2xl text-gray-500 hover:bg-gray-100 hover:text-gray-800" aria-label="Close Paystack popup">
-                &times;
-              </button>
-            </div>
-            <iframe
-              src={paystackPaymentPageUrl}
-              title="Paystack donation form"
-              className="min-h-0 flex-1 border-0"
-              allow="payment *; clipboard-read; clipboard-write"
-              sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
-            />
-            <div className="flex flex-col items-center gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3 text-center text-xs text-gray-600 sm:flex-row sm:justify-between">
-              <span>Secured by Paystack</span>
-              <button type="button" onClick={openPaystackBrowserPopup} className="font-semibold text-[#00A9D6] underline">
-                Open in browser popup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {paymentOpen && (
-        <Modal onClose={() => setPaymentOpen(false)}>
-          <h3 className="mb-6 text-2xl font-bold">M-Pesa Donation</h3>
-          <div className="mb-2 rounded-xl bg-gray-50 p-4">
-            <Input name="donorName" label="Full Name" value={donor.name} onChange={(event) => setDonor((value) => ({ ...value, name: event.target.value }))} required />
-            <Input name="donorEmail" type="email" label="Email Address" value={donor.email} onChange={(event) => setDonor((value) => ({ ...value, email: event.target.value }))} required />
-            <Input name="donorPhone" type="tel" label="M-Pesa Phone Number" value={donor.phone} onChange={(event) => setDonor((value) => ({ ...value, phone: event.target.value }))} required />
-            <Input name="donationAmount" type="number" label={`Amount (${paymentConfig.currency})`} value={amount} onChange={(event) => setAmount(event.target.value)} required />
-          </div>
-          {paymentError && <p className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700">{paymentError}</p>}
-          <button type="button" disabled={loading || !donor.email || !donor.phone || !(selectedAmount > 0)} onClick={startMpesaPayment} className="w-full rounded-lg bg-green-600 px-5 py-3 font-semibold text-white shadow-lg shadow-green-600/20 transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60">
-            {loading ? 'Sending prompt...' : 'Pay with M-Pesa'}
-          </button>
-          <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">Enter your M-Pesa phone number, then complete the STK Push prompt on your phone.</p>
-          <p className="mt-4 text-center text-xs text-gray-500"><Icon name="fa-lock" className="mr-1" />Secure payment processing via configured provider</p>
-        </Modal>
-      )}
-      {receipt && (
-        <Modal onClose={() => setReceipt(null)}>
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100"><Icon name="fa-check" className="text-3xl text-green-600" /></div>
-            <h3 className="mb-2 text-2xl font-bold">Thank You for Your Donation!</h3>
-            <p className="mb-4 text-gray-600">Your generosity makes a difference in the lives of women and children.</p>
-            <div className="mb-4 rounded-lg bg-gray-50 p-4 text-left text-sm">
-              <p><strong>Transaction ID:</strong> {receipt.transactionId}</p>
-              <p><strong>Amount:</strong> {receipt.currency || 'KES'} {receipt.amount}</p>
-              <p><strong>Program:</strong> {receipt.program}</p>
-              <p><strong>Donor:</strong> {receipt.donorName || receipt.email || 'Donor'}</p>
-              <p><strong>Date:</strong> {new Date(receipt.date).toLocaleString()}</p>
-              {receipt.paymentStatus && <p><strong>Status:</strong> {receipt.paymentStatus}</p>}
-              {receipt.mpesaMessage && <p className="mt-2 text-green-700"><strong>M-Pesa:</strong> {receipt.mpesaMessage}</p>}
-              {receipt.syncStatus === 'failed' && <p className="mt-2 text-orange-700"><strong>Backend sync:</strong> Pending</p>}
-            </div>
-            <button onClick={() => window.print()} className="mr-3 rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-700"><Icon name="fa-print" className="mr-2" />Print Receipt</button>
-            <button onClick={() => setReceipt(null)} className="rounded-lg bg-orange-600 px-6 py-2 text-white hover:bg-orange-700">Close</button>
-          </div>
-        </Modal>
-      )}
     </section>
   );
 }
@@ -470,10 +262,14 @@ export function Newsletter() {
       setEmail('');
       setMessage({ type: 'success', text: 'Successfully subscribed to newsletter!' });
     } catch (error) {
-      saveSubscriber(email);
-      saveSubmission('newsletter', { ...payload, syncStatus: 'failed', syncError: error.message });
-      setEmail('');
-      setMessage({ type: 'error', text: 'Subscribed locally, but backend sync is pending.' });
+      if (!error.status || error.status >= 500) {
+        saveSubscriber(email);
+        saveSubmission('newsletter', { ...payload, syncStatus: 'failed', syncError: error.message });
+        setEmail('');
+        setMessage({ type: 'error', text: 'Subscribed locally, but backend sync is pending.' });
+      } else {
+        setMessage({ type: 'error', text: error.message || 'Please enter a valid email address.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -503,12 +299,18 @@ export function EventsSection() {
   return (
     <section className="bg-gray-50 py-20">
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-3">
-        {cms.events.map(({ day, month, title, text }) => (
-          <div key={title} className="hover-lift overflow-hidden rounded-2xl bg-white shadow-lg">
-            <div className="bg-orange-600 p-6 text-center text-white"><span className="block text-4xl font-extrabold">{day}</span><span className="text-sm uppercase">{month}</span></div>
-            <div className="p-6"><h3 className="mb-2 text-xl font-bold">{title}</h3><p className="text-gray-600">{text}</p></div>
+        {cms.events.map(({ day, month, date, title, text }) => {
+          const eventDate = date ? new Date(`${date}T00:00:00`) : null;
+          const displayDay = eventDate && !Number.isNaN(eventDate.getTime()) ? String(eventDate.getDate()).padStart(2, '0') : day;
+          const displayMonth = eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate.toLocaleDateString(undefined, { month: 'short' }).toUpperCase() : month;
+          const displayDate = eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate.toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }) : `${day} ${month}`;
+          return (
+          <div key={`${title}-${displayDate}`} className="hover-lift overflow-hidden rounded-2xl bg-white shadow-lg">
+            <div className="bg-orange-600 p-6 text-center text-white"><span className="block text-4xl font-extrabold">{displayDay}</span><span className="text-sm uppercase">{displayMonth}</span></div>
+            <div className="p-6"><p className="mb-2 text-sm font-semibold uppercase tracking-wide text-orange-600"><Icon name="fa-calendar-days" className="mr-2" />{displayDate}</p><h3 className="mb-2 text-xl font-bold">{title}</h3><p className="text-gray-600">{text}</p></div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -519,14 +321,33 @@ export function BlogSection({ navigate }) {
   return (
     <section className="bg-gray-50 py-20">
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-3">
-        {cms.posts.map(({ category, title, text, image }) => (
-          <article key={title} className="hover-lift overflow-hidden rounded-2xl bg-white shadow-lg">
+        {cms.posts.map(({ category, title, text, image }, index) => (
+          <article key={`${title}-${index}`} className="hover-lift overflow-hidden rounded-2xl bg-white shadow-lg">
             <div className="h-48 overflow-hidden"><img src={image} alt={title} className="h-full w-full object-cover transition duration-300 hover:scale-105" /></div>
-            <div className="p-6"><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">{category}</span><h3 className="mb-2 mt-4 text-xl font-bold">{title}</h3><p className="mb-4 text-gray-600">{text}</p><LinkButton href="/blog-single" navigate={navigate} className="font-semibold text-orange-600">Read More <Icon name="fa-arrow-right" className="ml-1" /></LinkButton></div>
+            <div className="p-6"><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">{category}</span><h3 className="mb-2 mt-4 text-xl font-bold">{title}</h3><p className="mb-4 text-gray-600">{text}</p><LinkButton href={`/blog-single?post=${index}`} navigate={navigate} className="font-semibold text-orange-600">Read More <Icon name="fa-arrow-right" className="ml-1" /></LinkButton></div>
           </article>
         ))}
       </div>
     </section>
+  );
+}
+
+export function BlogPostContent() {
+  const cms = useCmsContent();
+  const requestedIndex = Number(new URLSearchParams(window.location.search).get('post'));
+  const index = Number.isInteger(requestedIndex) && requestedIndex >= 0 && requestedIndex < cms.posts.length ? requestedIndex : 0;
+  const post = cms.posts[index];
+  if (!post) return null;
+
+  return (
+    <article className="bg-white py-16">
+      <div className="container mx-auto max-w-4xl px-6">
+        <img src={post.image} alt={post.title} className="mb-8 h-96 w-full rounded-2xl object-cover" />
+        <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">{post.category}</span>
+        <h2 className="mt-5 text-4xl font-bold text-gray-900">{post.title}</h2>
+        <p className="mt-6 text-lg leading-relaxed text-gray-700">{post.text}</p>
+      </div>
+    </article>
   );
 }
 
@@ -535,8 +356,8 @@ export function GetInvolved({ navigate }) {
   return (
     <section className="bg-white py-20">
       <div className="container mx-auto grid gap-8 px-6 md:grid-cols-3">
-        {cms.involvement.map(({ icon, title, text, href }) => (
-          <div key={title} className="hover-lift rounded-2xl bg-gray-50 p-8 shadow">
+        {cms.involvement.map(({ icon, title, text, href }, index) => (
+          <div key={`${title}-${index}`} className="hover-lift rounded-2xl bg-gray-50 p-8 shadow">
             <Icon name={icon} className="mb-5 text-5xl text-orange-600" />
             <h3 className="mb-2 text-2xl font-bold">{title}</h3>
             <p className="mb-6 text-gray-600">{text}</p>

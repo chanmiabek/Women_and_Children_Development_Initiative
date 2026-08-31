@@ -1,5 +1,5 @@
 import React from 'react';
-import { AboutSection, BlogSection, EventsSection, GallerySection, GetInvolved, PolicyContent, ProgramsSection, TeamSection, TestimonialsSection } from '../components/sections.jsx';
+import { AboutSection, BlogPostContent, BlogSection, EventsSection, GallerySection, GetInvolved, PolicyContent, ProgramsSection, TeamSection, TestimonialsSection } from '../components/sections.jsx';
 import { PageHero } from '../components/ui.jsx';
 import { useCmsContent } from '../hooks/useCmsContent.js';
 import childrenImage from '../../assets/images/children.jpeg';
@@ -52,7 +52,8 @@ export function GenericPage({ type, navigate }) {
       {type === 'blog' && <><BlogSection navigate={navigate} /><GallerySection /></>}
       {type === 'about' && <><AboutSection /><TeamSection /><TestimonialsSection /><GallerySection /></>}
       {type === 'get-involved' && <GetInvolved navigate={navigate} />}
-      {!['programs', 'events', 'blog', 'about', 'get-involved'].includes(type) && <PolicyContent type={type} />}
+      {type === 'blog-single' && <BlogPostContent />}
+      {!['programs', 'events', 'blog', 'about', 'get-involved', 'blog-single'].includes(type) && <PolicyContent type={type} />}
     </>
   );
 }

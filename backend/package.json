@@ -8,11 +8,12 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/config.js && node --check src/store/jsonStore.js && node --check src/utils/validation.js && node --check src/services/emailService.js && node --check src/services/mpesaService.js && node --check src/services/paystackService.js && node --check src/routes/auth.js && node --check src/routes/content.js && node --check src/routes/dashboard.js && node --check src/routes/donations.js && node --check src/routes/newsletter.js && node --check src/routes/payments.js && node --check src/routes/submissions.js && node --check scripts/hash-password.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/config.js && node --check src/store/jsonStore.js && node --check src/utils/validation.js && node --check src/services/emailService.js && node --check src/services/cloudinaryService.js && node --check src/routes/auth.js && node --check src/routes/content.js && node --check src/routes/dashboard.js && node --check src/routes/newsletter.js && node --check src/routes/submissions.js && node --check src/routes/uploads.js && node --check scripts/hash-password.js",
     "hash-password": "node scripts/hash-password.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.10.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -20,6 +21,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
+    "multer": "^2.2.0",
     "nodemailer": "^9.0.1"
   }
 }

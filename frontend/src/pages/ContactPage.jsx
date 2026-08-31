@@ -19,8 +19,12 @@ export function ContactPage() {
       setStatus({ type: 'success', text: "Thank you for your message! We'll get back to you soon." });
       form.reset();
     } catch (error) {
-      saveSubmission('contact', { ...data, syncStatus: 'failed', syncError: error.message });
-      setStatus({ type: 'error', text: 'Saved locally, but the backend could not be reached. Please try syncing later.' });
+      if (!error.status || error.status >= 500) {
+        saveSubmission('contact', { ...data, syncStatus: 'failed', syncError: error.message });
+        setStatus({ type: 'error', text: 'Saved locally, but the backend could not be reached. Please try syncing later.' });
+      } else {
+        setStatus({ type: 'error', text: error.message || 'Please check the form and try again.' });
+      }
     } finally {
       setLoading(false);
     }

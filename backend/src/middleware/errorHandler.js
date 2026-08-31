@@ -8,10 +8,13 @@ export function notFound(req, res) {
 export function errorHandler(error, req, res, next) {
   if (res.headersSent) return next(error);
 
-  const status = error.status || 500;
+  console.error(`[${req.method} ${req.originalUrl}]`, error);
+
+  const status = error.status || (error.code === 'LIMIT_FILE_SIZE' ? 400 : 500);
+  const message = error.code === 'LIMIT_FILE_SIZE' ? 'Image must be 5 MB or smaller.' : error.message;
   res.status(status).json({
     ok: false,
-    message: status === 500 ? 'Internal server error.' : error.message,
+    message: status === 500 && process.env.NODE_ENV === 'production' ? 'Internal server error.' : message,
     details: error.details || undefined
   });
 }

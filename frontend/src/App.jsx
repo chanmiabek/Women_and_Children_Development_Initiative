@@ -44,7 +44,8 @@ export default function App() {
 }
 
 function normalizeRoute(path) {
-  let route = path.replace(/\/$/, '') || '/';
+  const pathname = path.split('?')[0];
+  let route = pathname.replace(/\/$/, '') || '/';
 
   if (route.endsWith('/index.html')) {
     route = route.replace(/\/index\.html$/i, '') || '/';

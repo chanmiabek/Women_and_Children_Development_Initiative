@@ -42,27 +42,6 @@ export async function notifyAdmin(subject, payload) {
   });
 }
 
-export async function sendDonorReceipt(donation) {
-  return sendMail({
-    to: donation.email,
-    subject: 'WCDI donation receipt',
-    text: [
-      `Dear ${donation.donorName || 'Donor'},`,
-      '',
-      'Thank you for supporting Women and Children Development Initiative.',
-      '',
-      `Transaction ID: ${donation.transactionId}`,
-      `Amount: ${donation.currency || 'KES'} ${donation.amount}`,
-      `Program: ${donation.program}`,
-      `Payment provider: ${donation.paymentProvider}`,
-      `Date: ${donation.date || donation.timestamp}`,
-      '',
-      'With gratitude,',
-      'WCDI'
-    ].join('\n')
-  });
-}
-
 export async function sendSubscriberWelcome(subscriber) {
   return sendMail({
     to: subscriber.email,

@@ -24,11 +24,6 @@ export function cleanText(value, maxLength = 2000) {
   return String(value || '').trim().slice(0, maxLength);
 }
 
-export function cleanNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
-}
-
 export function normalizeContact(payload) {
   requireFields(payload, ['name', 'email', 'message']);
   requireEmail(payload.email);
@@ -68,22 +63,3 @@ export function normalizeNewsletter(payload) {
   };
 }
 
-export function normalizeDonation(payload) {
-  requireFields(payload, ['amount', 'email']);
-  requireEmail(payload.email);
-  const amount = cleanNumber(payload.amount);
-  if (amount <= 0) throw badRequest('Donation amount must be greater than zero.', { field: 'amount' });
-
-  return {
-    transactionId: cleanText(payload.transactionId || `WCDI_${Date.now()}`, 120),
-    amount,
-    program: cleanText(payload.program || 'general', 120),
-    recurring: Boolean(payload.recurring),
-    donorName: cleanText(payload.donorName, 160),
-    email: cleanText(payload.email, 254).toLowerCase(),
-    currency: cleanText(payload.currency || 'KES', 12),
-    paymentProvider: cleanText(payload.paymentProvider || 'demo', 80),
-    date: cleanText(payload.date || new Date().toISOString(), 80),
-    providerResponse: payload.providerResponse && typeof payload.providerResponse === 'object' ? payload.providerResponse : {}
-  };
-}

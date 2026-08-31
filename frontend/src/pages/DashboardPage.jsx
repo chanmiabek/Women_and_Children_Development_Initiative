@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DataTable, Icon } from '../components/ui.jsx';
-import { adminLogin, fetchDashboard, hasBackend } from '../services/api.js';
+import { adminLogin, fetchContent, fetchDashboard, hasBackend, saveContent, submitContact, submitNewsletter, submitVolunteer, uploadImage } from '../services/api.js';
 import { editablePages, readCmsContent, resetCmsContent, writeCmsContent } from '../utils/cms.js';
-import { formatDate, normalizeSubscriberEmail, readJson } from '../utils/storage.js';
+import { formatDate, normalizeSubscriberEmail, readJson, removeSubmission } from '../utils/storage.js';
 
 const ADMIN_SESSION_KEY = 'wcdi_admin_session';
 
 export function DashboardPage({ navigate }) {
-  const [session, setSession] = useState(() => JSON.parse(localStorage.getItem(ADMIN_SESSION_KEY) || 'null'));
+  const [session, setSession] = useState(readAdminSession);
   const authenticated = Boolean(session?.token);
   const [activePanel, setActivePanel] = useState('content');
   const [tick, setTick] = useState(0);
@@ -17,15 +17,29 @@ export function DashboardPage({ navigate }) {
   const [activePage, setActivePage] = useState('home');
   const [message, setMessage] = useState('');
 
+  useEffect(() => {
+    if (!session?.expiresAt) return undefined;
+    const remaining = new Date(session.expiresAt).getTime() - Date.now();
+    if (!Number.isFinite(remaining) || remaining <= 0) {
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      setSession(null);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      setSession(null);
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [session?.expiresAt]);
+
   const data = useMemo(() => {
     if (remoteData) return normalizeDashboard(remoteData);
     const contacts = readJson('contact_submissions');
     const volunteers = readJson('volunteer_submissions');
     const newsletter = readJson('newsletter_submissions');
     const subscribers = readJson('newsletter_subscribers');
-    const donations = readJson('donations');
     const emails = [...new Set([...subscribers.map(normalizeSubscriberEmail), ...newsletter.map((item) => item.email)].filter(Boolean))];
-    return { contacts, volunteers, newsletter, subscribers, donations, emails };
+    return { contacts, volunteers, newsletter, subscribers, emails };
   }, [remoteData, tick]);
 
   useEffect(() => {
@@ -38,8 +52,13 @@ export function DashboardPage({ navigate }) {
         setRemoteData(payload);
         setRemoteStatus('Backend data loaded');
       })
-      .catch(() => {
+      .catch((error) => {
         if (!active) return;
+        if (error.status === 401) {
+          localStorage.removeItem(ADMIN_SESSION_KEY);
+          setSession(null);
+          return;
+        }
         setRemoteData(null);
         setRemoteStatus('Backend unavailable, showing local preview');
       });
@@ -48,15 +67,83 @@ export function DashboardPage({ navigate }) {
     };
   }, [authenticated, session?.token, tick]);
 
+  useEffect(() => {
+    if (!authenticated || !hasBackend()) return undefined;
+    let active = true;
+    const pending = [
+      ['contact', readJson('contact_submissions'), submitContact],
+      ['volunteer', readJson('volunteer_submissions'), submitVolunteer],
+      ['newsletter', readJson('newsletter_submissions'), submitNewsletter]
+    ].flatMap(([type, items, submitter]) => items.filter((item) => item.syncStatus === 'failed').map((item) => ({ type, item, submitter })));
+
+    if (!pending.length) return undefined;
+    setRemoteStatus(`Syncing ${pending.length} pending submission${pending.length === 1 ? '' : 's'}...`);
+    (async () => {
+      for (const { type, item, submitter } of pending) {
+        if (!active) return;
+        const { syncStatus, syncError, localId, timestamp, ...payload } = item;
+        try {
+          await submitter(payload);
+          removeSubmission(type, item);
+        } catch {
+          // Keep failed submissions locally for the next retry.
+        }
+      }
+      if (active) setTick((value) => value + 1);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [authenticated, session?.token]);
+
+  useEffect(() => {
+    if (!authenticated || !hasBackend()) return undefined;
+    fetchContent().then((remote) => {
+      if (remote) setCms(remote);
+    }).catch(() => undefined);
+    return undefined;
+  }, [authenticated, session?.token]);
+
+  const publishTimer = useRef(null);
+  const pendingCms = useRef(null);
+
+  useEffect(() => () => window.clearTimeout(publishTimer.current), []);
+
   if (!authenticated) {
     return <AdminLogin navigate={navigate} onLogin={(nextSession) => setSession(nextSession)} />;
   }
 
+  const publishCms = async (nextCms, status) => {
+    try {
+      const saved = await saveContent(nextCms, session.token);
+      if (pendingCms.current?.content === nextCms) {
+        pendingCms.current = null;
+        if (saved) {
+          setCms(saved);
+          writeCmsContent(saved);
+          setMessage(`${status} and published live`);
+        } else setMessage(`${status} locally`);
+      }
+    } catch (error) {
+      if (error.status === 401) {
+        localStorage.removeItem(ADMIN_SESSION_KEY);
+        setSession(null);
+        return;
+      }
+      if (pendingCms.current?.content === nextCms) setMessage(`${status} locally; live sync failed`);
+    }
+    window.setTimeout(() => setMessage(''), 2200);
+  };
+
   const saveCms = (nextCms, status = 'Changes saved') => {
     setCms(nextCms);
     writeCmsContent(nextCms);
-    setMessage(status);
-    window.setTimeout(() => setMessage(''), 2200);
+    pendingCms.current = { content: nextCms, status };
+    window.clearTimeout(publishTimer.current);
+    publishTimer.current = window.setTimeout(() => {
+      const pending = pendingCms.current;
+      if (pending) publishCms(pending.content, pending.status);
+    }, 600);
   };
 
   const updatePage = (field, value) => {
@@ -86,6 +173,11 @@ export function DashboardPage({ navigate }) {
     saveCms({ ...cms, [collection]: cms[collection].filter((_, itemIndex) => itemIndex !== index) }, 'Item deleted');
   };
 
+  const uploadCmsImage = async (file) => {
+    const result = await uploadImage(file, session.token);
+    return result.secure_url;
+  };
+
   const logout = () => {
     localStorage.removeItem(ADMIN_SESSION_KEY);
     setSession(null);
@@ -112,8 +204,7 @@ export function DashboardPage({ navigate }) {
           {[
             ['content', 'Manage Content', 'fa-pen-to-square'],
             ['activity', 'Overview', 'fa-chart-line'],
-            ['submissions', 'Submissions', 'fa-inbox'],
-            ['donations', 'Donations', 'fa-receipt']
+            ['submissions', 'Submissions', 'fa-inbox']
           ].map(([key, label, icon]) => (
             <button key={key} onClick={() => setActivePanel(key)} className={`block w-full rounded-lg px-4 py-3 text-left hover:bg-white/10 ${activePanel === key ? 'bg-white/10 text-orange-300' : ''}`}>
               <Icon name={icon} className="mr-2" />{label}
@@ -125,7 +216,7 @@ export function DashboardPage({ navigate }) {
       </aside>
       <main className="flex-1">
         <header className="sticky top-0 z-30 flex flex-col gap-4 border-b bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
-          <div><p className="text-sm font-semibold uppercase tracking-wide text-orange-600">{activePanel === 'content' ? 'Create, edit, update, and delete website content' : remoteStatus}</p><h2 className="text-3xl font-bold">WCDI Admin Tools</h2>{message && <p className="mt-2 text-sm font-semibold text-green-700">{message}</p>}</div>
+          <div><p className="text-sm font-semibold uppercase tracking-wide text-orange-600">{activePanel === 'content' ? 'Website content management' : remoteStatus}</p><h2 className="text-3xl font-bold">WCDI Website Dashboard</h2><p className="mt-1 text-sm text-gray-500">Keep your public website current, clear, and impactful.</p>{cms.updatedAt && <p className="mt-1 text-xs text-gray-400">Last published: {formatDate(cms.updatedAt)}</p>}{message && <p className="mt-2 text-sm font-semibold text-green-700">{message}</p>}</div>
           <div className="flex flex-wrap gap-3">
             <button onClick={exportData} className="rounded-lg bg-gray-900 px-5 py-3 font-semibold text-white hover:bg-gray-800"><Icon name="fa-download" className="mr-2" />Export JSON</button>
             <button onClick={() => setTick((value) => value + 1)} className="rounded-lg bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700"><Icon name="fa-rotate" className="mr-2" />Refresh</button>
@@ -161,24 +252,23 @@ export function DashboardPage({ navigate }) {
               </div>
             </div>
 
-            <CollectionEditor title="Programs" collection="programs" items={cms.programs} fields={programFields} onAdd={() => addItem('programs', createProgram())} onDelete={deleteItem} onUpdate={updateCollection} />
-            <CollectionEditor title="Events" collection="events" items={cms.events} fields={eventFields} onAdd={() => addItem('events', createEvent())} onDelete={deleteItem} onUpdate={updateCollection} />
-            <CollectionEditor title="Blog Posts" collection="posts" items={cms.posts} fields={postFields} onAdd={() => addItem('posts', createPost())} onDelete={deleteItem} onUpdate={updateCollection} />
-            <CollectionEditor title="Team Members" collection="team" items={cms.team} fields={teamFields} onAdd={() => addItem('team', createTeamMember())} onDelete={deleteItem} onUpdate={updateCollection} />
-            <CollectionEditor title="Testimonials" collection="testimonials" items={cms.testimonials} fields={testimonialFields} onAdd={() => addItem('testimonials', createTestimonial())} onDelete={deleteItem} onUpdate={updateCollection} />
-            <CollectionEditor title="Get Involved Cards" collection="involvement" items={cms.involvement} fields={involvementFields} onAdd={() => addItem('involvement', createInvolvement())} onDelete={deleteItem} onUpdate={updateCollection} />
+            <CollectionEditor onUploadImage={uploadCmsImage} title="Programs" collection="programs" items={cms.programs} fields={programFields} onAdd={() => addItem('programs', createProgram())} onDelete={deleteItem} onUpdate={updateCollection} />
+            <CollectionEditor onUploadImage={uploadCmsImage} title="Events" collection="events" items={cms.events} fields={eventFields} onAdd={() => addItem('events', createEvent())} onDelete={deleteItem} onUpdate={updateCollection} />
+            <CollectionEditor onUploadImage={uploadCmsImage} title="Blog Posts" collection="posts" items={cms.posts} fields={postFields} onAdd={() => addItem('posts', createPost())} onDelete={deleteItem} onUpdate={updateCollection} />
+            <CollectionEditor onUploadImage={uploadCmsImage} title="Team Members" collection="team" items={cms.team} fields={teamFields} onAdd={() => addItem('team', createTeamMember())} onDelete={deleteItem} onUpdate={updateCollection} />
+            <CollectionEditor onUploadImage={uploadCmsImage} title="Testimonials" collection="testimonials" items={cms.testimonials} fields={testimonialFields} onAdd={() => addItem('testimonials', createTestimonial())} onDelete={deleteItem} onUpdate={updateCollection} />
+            <CollectionEditor onUploadImage={uploadCmsImage} title="Get Involved Cards" collection="involvement" items={cms.involvement} fields={involvementFields} onAdd={() => addItem('involvement', createInvolvement())} onDelete={deleteItem} onUpdate={updateCollection} />
 
             <div className="rounded-xl bg-white p-6 shadow">
               <h3 className="mb-2 text-xl font-bold">Reset Content</h3>
               <p className="mb-4 text-sm text-gray-600">Restore all editable website content to the original frontend defaults.</p>
-              <button onClick={() => setCms(resetCmsContent())} className="rounded-lg border border-red-300 px-5 py-3 font-semibold text-red-700 hover:bg-red-50">Reset Website Content</button>
+              <button onClick={() => saveCms(resetCmsContent(), 'Website content restored')} className="rounded-lg border border-red-300 px-5 py-3 font-semibold text-red-700 hover:bg-red-50">Reset Website Content</button>
             </div>
           </section>
         )}
 
         {activePanel === 'activity' && <OverviewPanel data={data} />}
         {activePanel === 'submissions' && <SubmissionsPanel data={data} />}
-        {activePanel === 'donations' && <DonationsPanel data={data} />}
       </main>
     </div>
   );
@@ -225,12 +315,11 @@ function AdminLogin({ navigate, onLogin }) {
 function OverviewPanel({ data }) {
   return (
     <section id="overview" className="p-6">
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {[
           ['Contact Messages', data.contacts.length, 'text-orange-600'],
           ['Volunteer Applications', data.volunteers.length, 'text-blue-600'],
           ['Newsletter Subscribers', data.emails.length, 'text-green-600'],
-          ['Donation Records', data.donations.length, 'text-purple-600']
         ].map(([label, count, color]) => <div key={label} className="metric-card rounded-xl bg-white p-6 shadow"><p className="text-sm text-gray-500">{label}</p><p className={`mt-2 text-4xl font-bold ${color}`}>{count}</p></div>)}
       </div>
     </section>
@@ -242,20 +331,12 @@ function SubmissionsPanel({ data }) {
     <section className="grid gap-6 p-6 xl:grid-cols-2">
       <DataTable title="Recent Contact Messages" columns={['Name', 'Email', 'Subject', 'Date']} rows={data.contacts.slice(-8).reverse().map((item) => [item.name || '-', item.email || '-', item.subject || '-', formatDate(item.timestamp)])} empty="No contact messages stored yet." />
       <DataTable title="Volunteer Applications" columns={['Name', 'Email', 'Availability', 'Date']} rows={data.volunteers.slice(-8).reverse().map((item) => [item.fullName || '-', item.email || '-', item.availability || '-', formatDate(item.timestamp)])} empty="No volunteer applications stored yet." />
-    </section>
-  );
-}
-
-function DonationsPanel({ data }) {
-  return (
-    <section className="grid gap-6 p-6 xl:grid-cols-2">
-      <DataTable title="Donation Records" columns={['Transaction', 'Amount', 'Program', 'Date']} rows={data.donations.slice(-8).reverse().map((item) => [item.transactionId || '-', `${item.currency || 'KES'} ${item.amount || 0}`, item.program || '-', formatDate(item.date || item.timestamp)])} empty="No donation records stored yet." />
       <div className="overflow-hidden rounded-xl bg-white shadow"><div className="border-b p-6"><h3 className="text-xl font-bold">Newsletter Subscribers</h3></div><div className="flex flex-wrap gap-2 p-6">{data.emails.length ? data.emails.map((email) => <span key={email} className="rounded-full bg-green-50 px-3 py-2 text-sm text-green-700">{email}</span>) : <p className="text-gray-500">No newsletter subscribers stored yet.</p>}</div></div>
     </section>
   );
 }
 
-function CollectionEditor({ title, collection, items, fields, onAdd, onDelete, onUpdate }) {
+function CollectionEditor({ onUploadImage, title, collection, items, fields, onAdd, onDelete, onUpdate }) {
   return (
     <div className="rounded-xl bg-white p-6 shadow">
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -275,7 +356,7 @@ function CollectionEditor({ title, collection, items, fields, onAdd, onDelete, o
                   return <AdminTextArea key={field.name} label={field.label} value={item[field.name] || ''} onChange={(value) => onUpdate(collection, index, field.name, value)} className={field.full ? 'md:col-span-2' : ''} />;
                 }
                 if (field.type === 'image') {
-                  return <AdminImageInput key={field.name} label={field.label} value={item[field.name] || ''} onChange={(value) => onUpdate(collection, index, field.name, value)} className={field.full ? 'md:col-span-2' : ''} />;
+                  return <AdminImageInput key={field.name} label={field.label} value={item[field.name] || ''} onUpload={async (file) => { const imageUrl = await onUploadImage(file); onUpdate(collection, index, field.name, imageUrl); }} onChange={(value) => onUpdate(collection, index, field.name, value)} className={field.full ? 'md:col-span-2' : ''} />;
                 }
                 return <AdminInput key={field.name} label={field.label} value={item[field.name] || ''} type={field.type || 'text'} onChange={(value) => onUpdate(collection, index, field.name, field.type === 'number' ? Number(value) : value)} />;
               })}
@@ -305,12 +386,23 @@ function AdminTextArea({ label, value, onChange, className = '' }) {
   );
 }
 
-function AdminImageInput({ label, value, onChange, className = '' }) {
+function AdminImageInput({ label, value, onChange, onUpload, className = '' }) {
+  const [uploading, setUploading] = useState(false);
   const upload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => onChange(reader.result);
+    reader.onload = async () => {
+      setUploading(true);
+      try {
+        if (onUpload) await onUpload(file);
+        else onChange(reader.result);
+      } catch (error) {
+        window.alert(error.message || 'Image upload failed.');
+      } finally {
+        setUploading(false);
+      }
+    };
     reader.readAsDataURL(file);
     event.target.value = '';
   };
@@ -325,12 +417,12 @@ function AdminImageInput({ label, value, onChange, className = '' }) {
       )}
       <div className="flex flex-wrap gap-3">
         <label className="inline-flex cursor-pointer items-center rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-800">
-          <Icon name="fa-upload" className="mr-2" />Upload Image
+          <Icon name="fa-upload" className="mr-2" />{uploading ? 'Uploading to Cloudinary…' : 'Upload Image'}
           <input type="file" accept="image/*" onChange={upload} className="sr-only" />
         </label>
         {value && <button type="button" onClick={() => onChange('')} className="rounded-lg border border-red-300 px-4 py-3 text-sm font-semibold text-red-700 hover:bg-red-50"><Icon name="fa-trash" className="mr-2" />Remove</button>}
       </div>
-      <p className="mt-2 text-xs text-gray-500">Images are saved in this browser for preview and backend-ready CMS data.</p>
+      <p className="mt-2 text-xs text-gray-500">Images upload securely to Cloudinary and are published with your CMS changes.</p>
     </div>
   );
 }
@@ -348,6 +440,7 @@ const programFields = [
 ];
 
 const eventFields = [
+  { name: 'date', label: 'Event date', type: 'date' },
   { name: 'day', label: 'Day' },
   { name: 'month', label: 'Month' },
   { name: 'title', label: 'Title' },
@@ -389,7 +482,7 @@ function createProgram() {
 }
 
 function createEvent() {
-  return { day: '01', month: 'JAN', title: 'New Event', text: 'Describe this event.' };
+  return { date: new Date().toISOString().slice(0, 10), day: '01', month: 'JAN', title: 'New Event', text: 'Describe this event.' };
 }
 
 function createPost() {
@@ -413,7 +506,21 @@ function normalizeDashboard(payload) {
   const volunteers = payload.volunteers || payload.volunteer_submissions || [];
   const newsletter = payload.newsletter || payload.newsletter_submissions || [];
   const subscribers = payload.subscribers || payload.newsletter_subscribers || [];
-  const donations = payload.donations || [];
   const emails = [...new Set([...subscribers.map(normalizeSubscriberEmail), ...newsletter.map((item) => item.email)].filter(Boolean))];
-  return { contacts, volunteers, newsletter, subscribers, donations, emails };
+  return { contacts, volunteers, newsletter, subscribers, emails };
+}
+
+function readAdminSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem(ADMIN_SESSION_KEY) || 'null');
+    const expiresAt = session?.expiresAt ? new Date(session.expiresAt).getTime() : null;
+    if (!session?.token || (session.expiresAt && (!Number.isFinite(expiresAt) || expiresAt <= Date.now()))) {
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      return null;
+    }
+    return session;
+  } catch {
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+    return null;
+  }
 }

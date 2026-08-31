@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
 export function useRoute() {
-  const getPath = () => window.location.pathname.replace(/\/$/, '') || '/';
+  const getPath = () => `${window.location.pathname.replace(/\/$/, '') || '/'}${window.location.search}`;
   const getBasePath = () => {
-    const path = getPath();
+    const path = window.location.pathname.replace(/\/$/, '') || '/';
     const marker = path.match(/\/(about|programs|get-involved|events|blog|contact|donate|volunteer|faq|annual-report|privacy-policy|terms|success-stories|blog-single|admin)(\/|$)/);
     if (marker) return path.slice(0, marker.index) || '';
     if (path.endsWith('/index.html')) return path.replace(/\/index\.html$/i, '');
