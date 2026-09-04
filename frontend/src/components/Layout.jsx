@@ -78,8 +78,8 @@ function TopBar() {
     <div className="bg-gray-900 py-2 text-sm text-white">
       <div className="container mx-auto flex items-center justify-between px-6">
         <div className="flex flex-wrap gap-x-6 gap-y-1">
-          <span><Icon name="fa-phone-alt" className="mr-2 text-orange-500" />+254799091016</span>
-          <span><Icon name="fa-envelope" className="mr-2 text-orange-500" />info@wcdevinitiative.org</span>
+          <span><Icon name="fa-phone-alt" className="mr-2 text-orange-500" />+254 743 187 526</span>
+          <span><Icon name="fa-envelope" className="mr-2 text-orange-500" />wcdi.national.org2018@gmail.com</span>
         </div>
         <div className="hidden space-x-4 sm:flex">
           {['facebook-f', 'twitter', 'instagram', 'linkedin-in', 'youtube'].map((item) => <a key={item} href="#" className="transition hover:text-orange-500"><i className={`fab fa-${item}`} /></a>)}
