@@ -105,7 +105,7 @@ export const posts = [
 
 export const featuredImages = {
   hero: communityImage,
-  about: problemChildrenImage,
+  about: childrenImage ,
   impact: youthImage,
   training: trainingImage
 };
