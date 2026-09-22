@@ -17,7 +17,7 @@ export default function App() {
 
   const page = path.toLowerCase();
   const route = normalizeRoute(page);
-  if (route === '/admin/dashboard') return <DashboardPage navigate={navigate} />;
+  if (route === '/admin') return <DashboardPage navigate={navigate} />;
 
   let content;
   if (route === '/') {
@@ -57,11 +57,11 @@ function normalizeRoute(path) {
   }
 
   if (route.endsWith('/admin/dashboard.html')) {
-    route = '/admin/dashboard';
+    route = '/admin';
   }
 
   if (route.includes('/admin/dashboard')) {
-    return '/admin/dashboard';
+    return '/admin';
   }
 
   const knownRoutes = [

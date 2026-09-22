@@ -100,7 +100,7 @@ function Footer({ navigate }) {
             <div className="flex space-x-4">{['facebook-f', 'twitter', 'instagram', 'linkedin-in', 'youtube'].map((item) => <a key={item} href="#" className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800 transition hover:bg-orange-600"><i className={`fab fa-${item}`} /></a>)}</div>
           </div>
           <FooterLinks title="Quick Links" links={[['/', 'Home'], ['/about', 'About Us'], ['/programs', 'Our Programs'], ['/get-involved', 'Get Involved'], ['/contact', 'Contact']]} navigate={navigate} />
-          <FooterLinks title="Resources" links={[['/annual-report', 'Annual Report 2026'], ['/privacy-policy', 'Privacy Policy'], ['/terms', 'Terms of Use'], ['/faq', 'FAQ'], ['/admin/dashboard', 'Admin Dashboard']]} navigate={navigate} />
+          <FooterLinks title="Resources" links={[['/annual-report', 'Annual Report 2026'], ['/privacy-policy', 'Privacy Policy'], ['/terms', 'Terms of Use'], ['/faq', 'FAQ']]} navigate={navigate} />
           <div>
             <h4 className="mb-4 text-lg font-bold">Our Impact</h4>
             {[[92, 'Program Efficiency'], [100, 'Transparency Score'], [98, 'Beneficiary Satisfaction']].map(([value, label]) => (

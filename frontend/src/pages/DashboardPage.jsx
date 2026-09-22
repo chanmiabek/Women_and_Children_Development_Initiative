@@ -287,7 +287,7 @@ function AdminLogin({ navigate, onLogin }) {
       localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
       onLogin(session);
     } catch (error) {
-      setError(error.message || 'Invalid admin username or password.');
+      setError(error.message || 'Invalid admin email or password.');
     } finally {
       setLoading(false);
     }
@@ -301,7 +301,7 @@ function AdminLogin({ navigate, onLogin }) {
           <h1 className="text-2xl font-bold">Admin Login</h1>
           <p className="mt-2 text-sm text-gray-500">Sign in to create, edit, update, and delete website content.</p>
         </div>
-        <AdminInput label="Username" name="username" />
+        <AdminInput label="Email" name="email" type="email" autoComplete="email" />
         <AdminInput label="Password" name="password" type="password" />
         {error && <p className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700">{error}</p>}
         <button disabled={loading} className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'Signing in...' : 'Login'}</button>

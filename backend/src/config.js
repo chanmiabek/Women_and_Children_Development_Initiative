@@ -22,7 +22,7 @@ export const config = {
   allowAllCorsOrigins: configuredCorsOrigin.includes('*') || (!configuredCorsOrigin && nodeEnv === 'production'),
   adminApiToken: process.env.ADMIN_API_TOKEN || '',
   admin: {
-    username: process.env.ADMIN_USERNAME || 'admin',
+    email: process.env.ADMIN_EMAIL || '',
     passwordHash: process.env.ADMIN_PASSWORD_HASH || '',
     jwtSecret: process.env.ADMIN_JWT_SECRET || '',
     sessionHours: Number(process.env.ADMIN_SESSION_HOURS || 8)
