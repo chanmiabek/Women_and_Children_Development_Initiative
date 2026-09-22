@@ -7,12 +7,12 @@ export const authRouter = Router();
 
 authRouter.post('/auth/login', async (req, res, next) => {
   try {
-    const username = cleanText(req.body?.username, 120);
+    const email = cleanText(req.body?.email, 254).toLowerCase();
     const password = String(req.body?.password || '');
-    const token = await authenticateAdmin(username, password);
+    const token = await authenticateAdmin(email, password);
 
     if (!token) {
-      return res.status(401).json({ ok: false, message: 'Invalid admin username or password.' });
+      return res.status(401).json({ ok: false, message: 'Invalid admin email or password.' });
     }
 
     res.json({
@@ -20,7 +20,7 @@ authRouter.post('/auth/login', async (req, res, next) => {
       message: 'Admin authenticated.',
       data: {
         token,
-        username,
+        email,
         expiresInHours: config.admin.sessionHours,
         expiresAt: new Date(Date.now() + config.admin.sessionHours * 60 * 60 * 1000).toISOString()
       }

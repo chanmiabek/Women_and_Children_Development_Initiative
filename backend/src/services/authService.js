@@ -4,6 +4,7 @@ import { config } from '../config.js';
 
 function assertAdminConfigured() {
   const missing = [];
+  if (!config.admin.email) missing.push('ADMIN_EMAIL');
   if (!config.admin.passwordHash) missing.push('ADMIN_PASSWORD_HASH');
   if (!config.admin.jwtSecret) missing.push('ADMIN_JWT_SECRET');
   if (missing.length) {
@@ -14,14 +15,14 @@ function assertAdminConfigured() {
   }
 }
 
-export async function authenticateAdmin(username, password) {
+export async function authenticateAdmin(email, password) {
   assertAdminConfigured();
-  if (username !== config.admin.username) return null;
+  if (email.toLowerCase() !== config.admin.email.toLowerCase()) return null;
   const valid = await bcrypt.compare(String(password || ''), config.admin.passwordHash);
   if (!valid) return null;
 
   return jwt.sign(
-    { sub: config.admin.username, role: 'admin' },
+    { sub: config.admin.email, email: config.admin.email, role: 'admin' },
     config.admin.jwtSecret,
     { expiresIn: `${config.admin.sessionHours}h` }
   );

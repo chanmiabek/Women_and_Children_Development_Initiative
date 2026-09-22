@@ -17,6 +17,8 @@ Set the frontend environment variable to point at the API:
 VITE_API_BASE_URL=http://127.0.0.1:5000
 ```
 
+Admin login uses `ADMIN_EMAIL` and the securely stored `ADMIN_PASSWORD_HASH` from the backend environment.
+
 ## Endpoints
 
 - `GET /`

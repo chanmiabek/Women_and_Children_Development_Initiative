@@ -47,8 +47,8 @@ export function ContactPage() {
           </form>
           <div className="space-y-6">
             {[
-              ['fa-map-marker-alt', 'Visit Us', '123 Empowerment Street\nGlobal City, GC 12345\nUnited States'],
-              ['fa-phone', 'Call Us', '+1 (888) 123-4567\n+1 (555) 987-6543\nMon-Fri, 9AM-6PM EST'],
+              ['fa-map-marker-alt', 'Visit Us', 'Kakuma \nHongokong,'],
+              ['fa-phone', 'Call Us', '+254 743 187 526\nMon-Fri, 9AM-6PM EST'],
               ['fa-envelope', 'Email Us', 'info@wcdevinitiative.org\nsupport@wcdevinitiative.org\npartnerships@wcdevinitiative.org']
             ].map(([icon, title, text]) => <InfoBox key={title} icon={icon} title={title} text={text} />)}
           </div>
