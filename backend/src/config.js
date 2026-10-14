@@ -7,7 +7,7 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 dotenv.config({ path: path.join(rootDir, '.env') });
 
 function readOrigins(value) {
-  if (!value) return ['http://127.0.0.1:5176', 'http://localhost:5176'];
+  if (!value) return ['https://womenchildrendevelopmentinitiative.org', 'http://localhost:5176'];
   return value.split(',').map((origin) => origin.trim()).filter(Boolean);
 }
 
@@ -29,7 +29,7 @@ export const config = {
     otpMaxAttempts: 5
   },
   dataFile: path.resolve(rootDir, process.env.DATA_FILE || './data/db.json'),
-  publicBaseUrl: process.env.PUBLIC_BASE_URL || `http://127.0.0.1:${Number(process.env.PORT || 5000)}`,
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || `https://womenchildrendevelopmentinitiative.org${Number(process.env.PORT || 5000)}`,
   email: {
     enabled: process.env.EMAIL_ENABLED === 'true',
     host: process.env.SMTP_HOST || '',
