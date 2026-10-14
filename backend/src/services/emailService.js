@@ -28,6 +28,19 @@ async function sendMail(message) {
   });
 }
 
+export async function sendAdminOtp(email, code, expiresInMinutes) {
+  if (!config.email.enabled || !config.email.host || !config.email.from) {
+    const error = new Error('Admin email delivery is not configured.');
+    error.status = 503;
+    throw error;
+  }
+  return sendMail({
+    to: email,
+    subject: 'Your WCDI admin sign-in code',
+    text: `Your WCDI admin sign-in code is ${code}. It expires in ${expiresInMinutes} minutes. If you did not request it, you can ignore this email.`
+  });
+}
+
 function asRows(payload) {
   return Object.entries(payload)
     .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : JSON.stringify(value)}`)

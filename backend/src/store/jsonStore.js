@@ -8,6 +8,7 @@ const initialState = {
   volunteers: [],
   newsletter: [],
   subscribers: [],
+  otpChallenges: [],
   content: null
 };
 
@@ -34,10 +35,59 @@ async function updateState(mutator) {
   writeQueue = writeQueue.catch(() => undefined).then(async () => {
     const state = await readState();
     result = await mutator(state);
-    await fs.writeFile(config.dataFile, JSON.stringify(state, null, 2));
+    const temporaryFile = `${config.dataFile}.${process.pid}.tmp`;
+    await fs.writeFile(temporaryFile, JSON.stringify(state, null, 2), { mode: 0o600 });
+    await fs.rename(temporaryFile, config.dataFile);
   });
   await writeQueue;
   return result;
+}
+
+export async function createOtpChallenge(challenge) {
+  return updateState((state) => {
+    const now = Date.now();
+    state.otpChallenges = (Array.isArray(state.otpChallenges) ? state.otpChallenges : [])
+      .filter((item) => item.expiresAt > now && item.email !== challenge.email);
+    state.otpChallenges.push(challenge);
+    return challenge;
+  });
+}
+
+export async function deleteOtpChallenge(challengeId) {
+  return updateState((state) => {
+    state.otpChallenges = (Array.isArray(state.otpChallenges) ? state.otpChallenges : [])
+      .filter((item) => item.challengeId !== challengeId);
+  });
+}
+
+export async function verifyOtpChallenge(challengeId, email, isCodeValid, now, maxAttempts) {
+  return updateState((state) => {
+    const challenges = Array.isArray(state.otpChallenges) ? state.otpChallenges : [];
+    const index = challenges.findIndex((item) => item.challengeId === challengeId && item.email === email);
+    if (index === -1) return { status: 'invalid' };
+
+    const challenge = challenges[index];
+    if (challenge.expiresAt <= now) {
+      challenges.splice(index, 1);
+      state.otpChallenges = challenges;
+      return { status: 'expired' };
+    }
+    if (challenge.attempts >= maxAttempts) {
+      challenges.splice(index, 1);
+      state.otpChallenges = challenges;
+      return { status: 'locked' };
+    }
+    if (!isCodeValid(challenge.codeHash)) {
+      challenge.attempts += 1;
+      if (challenge.attempts >= maxAttempts) challenges.splice(index, 1);
+      state.otpChallenges = challenges;
+      return { status: 'invalid' };
+    }
+
+    challenges.splice(index, 1);
+    state.otpChallenges = challenges;
+    return { status: 'valid' };
+  });
 }
 
 export async function list(collection) {

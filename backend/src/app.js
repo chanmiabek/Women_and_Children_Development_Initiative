@@ -40,14 +40,18 @@ export function createApp() {
       message: 'WCDI backend API is running.',
       endpoints: [
         'GET /health',
-        'POST /auth/login',
+        'POST /auth/request-otp',
+        'POST /auth/verify-otp',
         'POST /contact',
         'POST /volunteers',
         'POST /newsletter',
+        'GET /contact (admin)',
+        'GET /volunteers (admin)',
+        'GET /newsletter (admin)',
         'GET /dashboard',
         'GET /content',
-        'PUT /content',
-        'POST /uploads/image'
+        'PUT /content (admin)',
+        'POST /uploads/image (admin)'
       ]
     });
   });
@@ -56,7 +60,6 @@ export function createApp() {
     res.json({
       ok: true,
       service: 'wcdi-backend',
-      environment: config.nodeEnv,
       timestamp: new Date().toISOString()
     });
   });

@@ -1,25 +1,73 @@
-import bcrypt from 'bcryptjs';
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
+import { createOtpChallenge, deleteOtpChallenge, verifyOtpChallenge } from '../store/jsonStore.js';
+import { sendAdminOtp } from './emailService.js';
 
 function assertAdminConfigured() {
-  const missing = [];
-  if (!config.admin.email) missing.push('ADMIN_EMAIL');
-  if (!config.admin.passwordHash) missing.push('ADMIN_PASSWORD_HASH');
-  if (!config.admin.jwtSecret) missing.push('ADMIN_JWT_SECRET');
-  if (missing.length) {
-    const error = new Error('Admin authentication is not fully configured.');
+  if (!config.admin.email || config.admin.jwtSecret.length < 32) {
+    const error = new Error('Admin sign-in is not configured.');
     error.status = 503;
-    error.details = { missing };
+    throw error;
+  }
+  if (!Number.isFinite(config.admin.sessionHours) || config.admin.sessionHours < 1 || config.admin.sessionHours > 24) {
+    const error = new Error('Admin session duration is not configured correctly.');
+    error.status = 503;
+    throw error;
+  }
+  if (!Number.isFinite(config.admin.otpMinutes) || config.admin.otpMinutes < 1 || config.admin.otpMinutes > 15) {
+    const error = new Error('Admin code expiry is not configured correctly.');
+    error.status = 503;
     throw error;
   }
 }
 
-export async function authenticateAdmin(email, password) {
+function hashOtp(challengeId, code) {
+  return createHmac('sha256', config.admin.jwtSecret).update(`${challengeId}:${code}`).digest();
+}
+
+export async function requestAdminOtp(email) {
   assertAdminConfigured();
-  if (email.toLowerCase() !== config.admin.email.toLowerCase()) return null;
-  const valid = await bcrypt.compare(String(password || ''), config.admin.passwordHash);
-  if (!valid) return null;
+  const challengeId = randomBytes(32).toString('hex');
+  if (email !== config.admin.email.toLowerCase()) return challengeId;
+
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  const expiresAt = Date.now() + config.admin.otpMinutes * 60 * 1000;
+  await createOtpChallenge({
+    challengeId,
+    email,
+    codeHash: hashOtp(challengeId, code).toString('hex'),
+    attempts: 0,
+    expiresAt
+  });
+
+  try {
+    await sendAdminOtp(email, code, config.admin.otpMinutes);
+  } catch (error) {
+    await deleteOtpChallenge(challengeId);
+    throw error;
+  }
+  return challengeId;
+}
+
+export async function authenticateAdminWithOtp(email, challengeId, code) {
+  assertAdminConfigured();
+  if (email !== config.admin.email.toLowerCase() || !/^[a-f0-9]{64}$/.test(challengeId) || !/^\d{6}$/.test(code)) {
+    return null;
+  }
+
+  const result = await verifyOtpChallenge(
+    challengeId,
+    email,
+    (storedHash) => {
+      const expected = Buffer.from(storedHash, 'hex');
+      const provided = hashOtp(challengeId, code);
+      return expected.length === provided.length && timingSafeEqual(expected, provided);
+    },
+    Date.now(),
+    config.admin.otpMaxAttempts
+  );
+  if (result.status !== 'valid') return null;
 
   return jwt.sign(
     { sub: config.admin.email, email: config.admin.email, role: 'admin' },

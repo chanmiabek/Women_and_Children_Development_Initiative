@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DataTable, Icon } from '../components/ui.jsx';
-import { adminLogin, fetchContent, fetchDashboard, hasBackend, saveContent, submitContact, submitNewsletter, submitVolunteer, uploadImage } from '../services/api.js';
+import { fetchContent, fetchDashboard, hasBackend, requestAdminOtp, saveContent, submitContact, submitNewsletter, submitVolunteer, uploadImage, verifyAdminOtp } from '../services/api.js';
 import { editablePages, readCmsContent, resetCmsContent, writeCmsContent } from '../utils/cms.js';
 import { formatDate, normalizeSubscriberEmail, readJson, removeSubmission } from '../utils/storage.js';
 
@@ -277,17 +277,25 @@ export function DashboardPage({ navigate }) {
 function AdminLogin({ navigate, onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [challenge, setChallenge] = useState(null);
   const submit = async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     setError('');
     setLoading(true);
     try {
-      const session = await adminLogin(data);
-      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
-      onLogin(session);
+      if (!challenge) {
+        const result = await requestAdminOtp({ email: data.email });
+        setEmail(data.email);
+        setChallenge(result);
+      } else {
+        const session = await verifyAdminOtp({ email, challengeId: challenge.challengeId, code: data.code });
+        localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+        onLogin(session);
+      }
     } catch (error) {
-      setError(error.message || 'Invalid admin email or password.');
+      setError(error.message || (challenge ? 'The code could not be verified.' : 'A sign-in code could not be sent.'));
     } finally {
       setLoading(false);
     }
@@ -301,12 +309,19 @@ function AdminLogin({ navigate, onLogin }) {
           <h1 className="text-2xl font-bold">Admin Login</h1>
           <p className="mt-2 text-sm text-gray-500">Sign in to create, edit, update, and delete website content.</p>
         </div>
-        <AdminInput label="Email" name="email" type="email" autoComplete="email" />
-        <AdminInput label="Password" name="password" type="password" />
+        {!challenge ? (
+          <AdminInput label="Admin email" name="email" type="email" autoComplete="email" required value={email} onChange={setEmail} />
+        ) : (
+          <>
+            <p className="mb-4 rounded-lg bg-orange-50 p-3 text-sm text-orange-800">Enter the six-digit code sent to {email}. It expires in {challenge.expiresInMinutes} minutes.</p>
+            <AdminInput label="One-time code" name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" required />
+          </>
+        )}
         {error && <p className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700">{error}</p>}
-        <button disabled={loading} className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'Signing in...' : 'Login'}</button>
+        <button disabled={loading} className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">{loading ? (challenge ? 'Verifying...' : 'Sending code...') : (challenge ? 'Verify code' : 'Send sign-in code')}</button>
+        {challenge && <button type="button" onClick={() => { setChallenge(null); setError(''); }} className="mt-3 w-full rounded-lg border py-3 font-semibold text-gray-700 hover:bg-gray-50">Use a different email</button>}
         <button type="button" onClick={() => navigate('/')} className="mt-3 w-full rounded-lg border py-3 font-semibold text-gray-700 hover:bg-gray-50">Back to Website</button>
-        <p className="mt-4 text-center text-xs text-gray-500">Admin access is verified by the backend. Keep credentials only in backend environment variables.</p>
+        <p className="mt-4 text-center text-xs text-gray-500">Admin access is verified by an email code. Keep SMTP and signing secrets in backend environment variables.</p>
       </form>
     </main>
   );
@@ -418,11 +433,11 @@ function AdminImageInput({ label, value, onChange, onUpload, className = '' }) {
       <div className="flex flex-wrap gap-3">
         <label className="inline-flex cursor-pointer items-center rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-800">
           <Icon name="fa-upload" className="mr-2" />{uploading ? 'Uploading to Cloudinary…' : 'Upload Image'}
-          <input type="file" accept="image/*" onChange={upload} className="sr-only" />
+          <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={upload} className="sr-only" />
         </label>
         {value && <button type="button" onClick={() => onChange('')} className="rounded-lg border border-red-300 px-4 py-3 text-sm font-semibold text-red-700 hover:bg-red-50"><Icon name="fa-trash" className="mr-2" />Remove</button>}
       </div>
-      <p className="mt-2 text-xs text-gray-500">Images up to 10 MB upload securely to Cloudinary and are published with your CMS changes.</p>
+      <p className="mt-2 text-xs text-gray-500">JPEG, PNG, GIF, or WebP images up to 10 MB upload securely to Cloudinary and are published with your CMS changes.</p>
     </div>
   );
 }

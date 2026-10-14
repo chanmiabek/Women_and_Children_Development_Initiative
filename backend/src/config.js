@@ -13,19 +13,20 @@ function readOrigins(value) {
 
 const configuredCorsOrigin = process.env.CORS_ORIGIN || '';
 const nodeEnv = process.env.NODE_ENV || 'development';
+const corsOrigins = configuredCorsOrigin ? readOrigins(configuredCorsOrigin) : readOrigins('');
 
 export const config = {
   rootDir,
   port: Number(process.env.PORT || 5000),
   nodeEnv,
-  corsOrigins: configuredCorsOrigin ? readOrigins(configuredCorsOrigin) : (nodeEnv === 'production' ? ['*'] : readOrigins('')),
-  allowAllCorsOrigins: configuredCorsOrigin.includes('*') || (!configuredCorsOrigin && nodeEnv === 'production'),
-  adminApiToken: process.env.ADMIN_API_TOKEN || '',
+  corsOrigins: nodeEnv === 'production' ? corsOrigins.filter((origin) => origin !== '*') : corsOrigins,
+  allowAllCorsOrigins: nodeEnv !== 'production' && configuredCorsOrigin.includes('*'),
   admin: {
     email: process.env.ADMIN_EMAIL || '',
-    passwordHash: process.env.ADMIN_PASSWORD_HASH || '',
     jwtSecret: process.env.ADMIN_JWT_SECRET || '',
-    sessionHours: Number(process.env.ADMIN_SESSION_HOURS || 8)
+    sessionHours: Number(process.env.ADMIN_SESSION_HOURS || 8),
+    otpMinutes: Number(process.env.ADMIN_OTP_MINUTES || 10),
+    otpMaxAttempts: 5
   },
   dataFile: path.resolve(rootDir, process.env.DATA_FILE || './data/db.json'),
   publicBaseUrl: process.env.PUBLIC_BASE_URL || `http://127.0.0.1:${Number(process.env.PORT || 5000)}`,

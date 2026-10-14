@@ -1,7 +1,8 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:5000' : 'https://wcdi-api.onrender.com')).trim().replace(/\/$/, '');
 
 const ENDPOINTS = {
-  login: '/auth/login',
+  requestOtp: '/auth/request-otp',
+  verifyOtp: '/auth/verify-otp',
   contact: '/contact',
   volunteer: '/volunteers',
   newsletter: '/newsletter',
@@ -14,8 +15,13 @@ export function hasBackend() {
   return Boolean(API_BASE_URL);
 }
 
-export async function adminLogin(payload) {
-  const response = await postJson(ENDPOINTS.login, payload);
+export async function requestAdminOtp(payload) {
+  const response = await postJson(ENDPOINTS.requestOtp, payload);
+  return response.data?.data;
+}
+
+export async function verifyAdminOtp(payload) {
+  const response = await postJson(ENDPOINTS.verifyOtp, payload);
   return response.data?.data;
 }
 
