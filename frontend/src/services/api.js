@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:5000' : 'https://wcdi-api.onrender.com')).trim().replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'https://womenchildrendevelopmentinitiative.org' : 'https://wcdi-api.onrender.com')).trim().replace(/\/$/, '');
 
 const ENDPOINTS = {
   requestOtp: '/auth/request-otp',

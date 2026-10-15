@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DataTable, Icon } from '../components/ui.jsx';
 import { fetchContent, fetchDashboard, hasBackend, requestAdminOtp, saveContent, submitContact, submitNewsletter, submitVolunteer, uploadImage, verifyAdminOtp } from '../services/api.js';
-import { editablePages, readCmsContent, resetCmsContent, writeCmsContent } from '../utils/cms.js';
+import { editablePages, getDefaultCmsContent, mergeCmsContent, readCmsContent, resetCmsContent, writeCmsContent } from '../utils/cms.js';
 import { formatDate, normalizeSubscriberEmail, readJson, removeSubmission } from '../utils/storage.js';
 
 const ADMIN_SESSION_KEY = 'wcdi_admin_session';
@@ -99,7 +99,7 @@ export function DashboardPage({ navigate }) {
   useEffect(() => {
     if (!authenticated || !hasBackend()) return undefined;
     fetchContent().then((remote) => {
-      if (remote) setCms(remote);
+      if (remote) setCms(mergeCmsContent(getDefaultCmsContent(), remote));
     }).catch(() => undefined);
     return undefined;
   }, [authenticated, session?.token]);
@@ -258,6 +258,7 @@ export function DashboardPage({ navigate }) {
             <CollectionEditor onUploadImage={uploadCmsImage} title="Team Members" collection="team" items={cms.team} fields={teamFields} onAdd={() => addItem('team', createTeamMember())} onDelete={deleteItem} onUpdate={updateCollection} />
             <CollectionEditor onUploadImage={uploadCmsImage} title="Testimonials" collection="testimonials" items={cms.testimonials} fields={testimonialFields} onAdd={() => addItem('testimonials', createTestimonial())} onDelete={deleteItem} onUpdate={updateCollection} />
             <CollectionEditor onUploadImage={uploadCmsImage} title="Get Involved Cards" collection="involvement" items={cms.involvement} fields={involvementFields} onAdd={() => addItem('involvement', createInvolvement())} onDelete={deleteItem} onUpdate={updateCollection} />
+            <CollectionEditor onUploadImage={uploadCmsImage} title="Partners" collection="partners" items={cms.partners} fields={partnerFields} onAdd={() => addItem('partners', createPartner())} onDelete={deleteItem} onUpdate={updateCollection} />
 
             <div className="rounded-xl bg-white p-6 shadow">
               <h3 className="mb-2 text-xl font-bold">Reset Content</h3>
@@ -277,7 +278,6 @@ export function DashboardPage({ navigate }) {
 function AdminLogin({ navigate, onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
   const [challenge, setChallenge] = useState(null);
   const submit = async (event) => {
     event.preventDefault();
@@ -286,11 +286,10 @@ function AdminLogin({ navigate, onLogin }) {
     setLoading(true);
     try {
       if (!challenge) {
-        const result = await requestAdminOtp({ email: data.email });
-        setEmail(data.email);
+        const result = await requestAdminOtp();
         setChallenge(result);
       } else {
-        const session = await verifyAdminOtp({ email, challengeId: challenge.challengeId, code: data.code });
+        const session = await verifyAdminOtp({ challengeId: challenge.challengeId, code: data.code });
         localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
         onLogin(session);
       }
@@ -310,16 +309,16 @@ function AdminLogin({ navigate, onLogin }) {
           <p className="mt-2 text-sm text-gray-500">Sign in to create, edit, update, and delete website content.</p>
         </div>
         {!challenge ? (
-          <AdminInput label="Admin email" name="email" type="email" autoComplete="email" required value={email} onChange={setEmail} />
+          <p className="mb-4 rounded-lg bg-orange-50 p-3 text-sm text-orange-800">A one-time code will be sent to the registered admin email.</p>
         ) : (
           <>
-            <p className="mb-4 rounded-lg bg-orange-50 p-3 text-sm text-orange-800">Enter the six-digit code sent to {email}. It expires in {challenge.expiresInMinutes} minutes.</p>
+            <p className="mb-4 rounded-lg bg-orange-50 p-3 text-sm text-orange-800">Enter the six-digit code sent to the registered admin email. It expires in {challenge.expiresInMinutes} minutes.</p>
             <AdminInput label="One-time code" name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" required />
           </>
         )}
         {error && <p className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700">{error}</p>}
         <button disabled={loading} className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">{loading ? (challenge ? 'Verifying...' : 'Sending code...') : (challenge ? 'Verify code' : 'Send sign-in code')}</button>
-        {challenge && <button type="button" onClick={() => { setChallenge(null); setError(''); }} className="mt-3 w-full rounded-lg border py-3 font-semibold text-gray-700 hover:bg-gray-50">Use a different email</button>}
+        {challenge && <button type="button" onClick={() => { setChallenge(null); setError(''); }} className="mt-3 w-full rounded-lg border py-3 font-semibold text-gray-700 hover:bg-gray-50">Request a new code</button>}
         <button type="button" onClick={() => navigate('/')} className="mt-3 w-full rounded-lg border py-3 font-semibold text-gray-700 hover:bg-gray-50">Back to Website</button>
         <p className="mt-4 text-center text-xs text-gray-500">Admin access is verified by an email code. Keep SMTP and signing secrets in backend environment variables.</p>
       </form>
@@ -492,6 +491,13 @@ const involvementFields = [
   { name: 'text', label: 'Description', type: 'textarea', full: true }
 ];
 
+const partnerFields = [
+  { name: 'name', label: 'Partner name' },
+  { name: 'url', label: 'Website URL' },
+  { name: 'icon', label: 'Fallback icon class' },
+  { name: 'logo', label: 'Partner logo', type: 'image', full: true }
+];
+
 function createProgram() {
   return { title: 'New Program', icon: 'fa-hands-helping', colors: 'from-orange-500 to-orange-600', image: '', text: 'Describe this program.', goal: '$0', raised: '$0', progress: 0, beneficiaries: '0 beneficiaries' };
 }
@@ -514,6 +520,10 @@ function createTestimonial() {
 
 function createInvolvement() {
   return { icon: 'fa-hands-helping', title: 'New Action', text: 'Describe this way to get involved.', href: '/contact' };
+}
+
+function createPartner() {
+  return { name: 'New Partner', icon: 'fa-handshake', logo: '', url: '' };
 }
 
 function normalizeDashboard(payload) {

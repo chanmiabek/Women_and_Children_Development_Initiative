@@ -26,10 +26,10 @@ function hashOtp(challengeId, code) {
   return createHmac('sha256', config.admin.jwtSecret).update(`${challengeId}:${code}`).digest();
 }
 
-export async function requestAdminOtp(email) {
+export async function requestAdminOtp() {
   assertAdminConfigured();
   const challengeId = randomBytes(32).toString('hex');
-  if (email !== config.admin.email.toLowerCase()) return challengeId;
+  const email = config.admin.email.toLowerCase();
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const expiresAt = Date.now() + config.admin.otpMinutes * 60 * 1000;
@@ -50,15 +50,15 @@ export async function requestAdminOtp(email) {
   return challengeId;
 }
 
-export async function authenticateAdminWithOtp(email, challengeId, code) {
+export async function authenticateAdminWithOtp(challengeId, code) {
   assertAdminConfigured();
-  if (email !== config.admin.email.toLowerCase() || !/^[a-f0-9]{64}$/.test(challengeId) || !/^\d{6}$/.test(code)) {
+  if (!/^[a-f0-9]{64}$/.test(challengeId) || !/^\d{6}$/.test(code)) {
     return null;
   }
 
   const result = await verifyOtpChallenge(
     challengeId,
-    email,
+    config.admin.email.toLowerCase(),
     (storedHash) => {
       const expected = Buffer.from(storedHash, 'hex');
       const provided = hashOtp(challengeId, code);

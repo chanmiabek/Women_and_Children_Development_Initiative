@@ -48,11 +48,21 @@ function asRows(payload) {
 }
 
 export async function notifyAdmin(subject, payload) {
-  return sendMail({
-    to: config.email.adminTo,
-    subject,
-    text: asRows(payload)
-  });
+  try {
+    const result = await sendMail({
+      to: config.email.adminTo,
+      replyTo: payload.email || undefined,
+      subject,
+      text: asRows(payload)
+    });
+    if (result.skipped) {
+      console.warn(`[email] Skipped "${subject}": set EMAIL_ENABLED=true and ADMIN_EMAIL in the backend environment.`);
+    }
+    return result;
+  } catch (error) {
+    console.error(`[email] Could not send "${subject}" to the configured admin address.`, error);
+    return { skipped: true, failed: true };
+  }
 }
 
 export async function sendSubscriberWelcome(subscriber) {

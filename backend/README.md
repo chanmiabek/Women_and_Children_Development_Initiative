@@ -20,8 +20,8 @@ Admin access uses a six-digit email code. Configure `ADMIN_EMAIL`, a random `ADM
 ## Endpoints
 
 - `GET /` lists the API routes; `GET /health` is the health check.
-- `POST /auth/request-otp` accepts `{ "email": "admin@example.com" }`.
-- `POST /auth/verify-otp` accepts `{ "email": "admin@example.com", "challengeId": "…", "code": "123456" }` and returns a bearer token.
+- `POST /auth/request-otp` sends a code to the existing `ADMIN_EMAIL`; the request does not accept an email address.
+- `POST /auth/verify-otp` accepts `{ "challengeId": "…", "code": "123456" }` and returns a bearer token.
 - `POST /contact`, `POST /volunteers`, and `POST /newsletter` accept public submissions.
 - `GET /content` reads public CMS content.
 - `GET /dashboard`, `GET /contact`, `GET /volunteers`, `GET /newsletter`, `PUT /content`, and `POST /uploads/image` require `Authorization: Bearer <session-token>`.
@@ -32,6 +32,6 @@ The default store is `data/db.json`, selected by `DATA_FILE`. It must point to a
 
 ## Email and images
 
-SMTP is required for admin login codes. Contact, volunteer, and newsletter notifications are best effort, so submission saving does not depend on notification delivery. Admin image uploads require `CLOUDINARY_URL` and are limited to 10 MB.
+Admin OTP codes and contact and volunteer form notifications use the configured SMTP account. To deliver these to Gmail, set `ADMIN_EMAIL` and `SMTP_USER` to the receiving Gmail address, use `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`, and put a Google App Password in `SMTP_PASS`. `MAIL_FROM` should be that Gmail address or a verified Gmail alias. The contact and volunteer forms save submissions even if email delivery fails; backend logs report skipped or failed notifications. Newsletter notifications are also sent best effort. Admin image uploads require `CLOUDINARY_URL` and are limited to 10 MB.
 
 Donations are handled by the Donorbox widget embedded in the frontend. The backend does not process or store donation transactions.

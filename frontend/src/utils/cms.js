@@ -126,6 +126,14 @@ export function getDefaultCmsContent() {
         text: 'Collaborate on programs, events, advocacy, and community outreach.', 
         href: '/contact' 
       }
+    ],
+    partners: [
+      { name: 'UN Women', icon: 'fa-building', logo: '', url: '' },
+      { name: 'Global Fund', icon: 'fa-globe', logo: '', url: '' },
+      { name: 'Red Cross', icon: 'fa-hand-holding-heart', logo: '', url: '' },
+      { name: 'World Bank', icon: 'fa-university', logo: '', url: '' },
+      { name: 'USAID', icon: 'fa-chart-line', logo: '', url: '' },
+      { name: 'WWF', icon: 'fa-tree', logo: '', url: '' }
     ]
   };
 }
@@ -150,7 +158,7 @@ export function resetCmsContent() {
   return defaults;
 }
 
-function mergeCmsContent(defaults, stored) {
+export function mergeCmsContent(defaults, stored) {
   if (!stored || typeof stored !== 'object') return defaults;
   return {
     ...defaults,
@@ -162,6 +170,7 @@ function mergeCmsContent(defaults, stored) {
     posts: Array.isArray(stored.posts) ? stored.posts : defaults.posts,
     team: Array.isArray(stored.team) ? stored.team : defaults.team,
     testimonials: Array.isArray(stored.testimonials) ? stored.testimonials : defaults.testimonials,
-    involvement: Array.isArray(stored.involvement) ? stored.involvement : defaults.involvement
+    involvement: Array.isArray(stored.involvement) ? stored.involvement : defaults.involvement,
+    partners: Array.isArray(stored.partners) ? stored.partners : defaults.partners
   };
 }

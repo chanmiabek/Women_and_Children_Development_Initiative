@@ -385,16 +385,25 @@ export function PolicyContent({ type }) {
 }
 
 export function Partners() {
+  const cms = useCmsContent();
   return (
     <section className="border-t border-gray-100 bg-white py-16">
       <SectionTitle title="Our Trusted Partners" text="Working together for greater impact" />
-      <div className="container mx-auto grid grid-cols-2 items-center gap-8 px-6 md:grid-cols-6">
-        {['UN Women', 'Global Fund', 'Red Cross', 'World Bank', 'USAID', 'WWF'].map((partner, index) => (
-          <div key={partner} className="text-center grayscale transition hover:grayscale-0">
-            <Icon name={['fa-building', 'fa-globe', 'fa-hand-holding-heart', 'fa-university', 'fa-chart-line', 'fa-tree'][index]} className="text-5xl text-gray-400" />
-            <p className="mt-2 text-xs text-gray-500">{partner}</p>
-          </div>
-        ))}
+      <div className="container mx-auto grid grid-cols-2 items-center gap-8 px-6 sm:grid-cols-3 md:grid-cols-6">
+        {cms.partners.map((partner, index) => {
+          const content = (
+            <>
+              {partner.logo ? <img src={partner.logo} alt={`${partner.name} logo`} className="mx-auto h-14 max-w-36 object-contain grayscale transition hover:grayscale-0" /> : <Icon name={partner.icon || 'fa-handshake'} className="text-5xl text-gray-400" />}
+              <p className="mt-2 text-xs text-gray-500">{partner.name}</p>
+            </>
+          );
+          const safeUrl = /^https?:\/\//i.test(partner.url || '') ? partner.url : '';
+          return safeUrl ? (
+            <a key={`${partner.name}-${index}`} href={safeUrl} target="_blank" rel="noreferrer" className="text-center grayscale transition hover:grayscale-0">{content}</a>
+          ) : (
+            <div key={`${partner.name}-${index}`} className="text-center grayscale transition hover:grayscale-0">{content}</div>
+          );
+        })}
       </div>
     </section>
   );
