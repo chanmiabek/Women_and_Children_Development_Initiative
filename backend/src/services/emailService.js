@@ -34,11 +34,19 @@ export async function sendAdminOtp(email, code, expiresInMinutes) {
     error.status = 503;
     throw error;
   }
-  return sendMail({
-    to: email,
-    subject: 'Your WCDI admin sign-in code',
-    text: `Your WCDI admin sign-in code is ${code}. It expires in ${expiresInMinutes} minutes. If you did not request it, you can ignore this email.`
-  });
+  try {
+    return await sendMail({
+      to: email,
+      subject: 'Your WCDI admin sign-in code',
+      text: `Your WCDI admin sign-in code is ${code}. It expires in ${expiresInMinutes} minutes. If you did not request it, you can ignore this email.`
+    });
+  } catch (error) {
+    console.error('[email] Admin OTP delivery failed.', error);
+    const deliveryError = new Error('Could not send the sign-in code. Check the backend Gmail SMTP settings and app password.');
+    deliveryError.status = 503;
+    deliveryError.details = { providerCode: error.code || undefined };
+    throw deliveryError;
+  }
 }
 
 function asRows(payload) {

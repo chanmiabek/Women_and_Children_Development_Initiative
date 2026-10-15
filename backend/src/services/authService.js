@@ -33,18 +33,29 @@ export async function requestAdminOtp() {
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const expiresAt = Date.now() + config.admin.otpMinutes * 60 * 1000;
-  await createOtpChallenge({
-    challengeId,
-    email,
-    codeHash: hashOtp(challengeId, code).toString('hex'),
-    attempts: 0,
-    expiresAt
-  });
+  try {
+    await createOtpChallenge({
+      challengeId,
+      email,
+      codeHash: hashOtp(challengeId, code).toString('hex'),
+      attempts: 0,
+      expiresAt
+    });
+  } catch (error) {
+    console.error('[auth] Could not persist an admin OTP challenge.', error);
+    const storageError = new Error('Admin sign-in is temporarily unavailable because the server could not store the login code.');
+    storageError.status = 503;
+    throw storageError;
+  }
 
   try {
     await sendAdminOtp(email, code, config.admin.otpMinutes);
   } catch (error) {
-    await deleteOtpChallenge(challengeId);
+    try {
+      await deleteOtpChallenge(challengeId);
+    } catch (cleanupError) {
+      console.error('[auth] Could not remove the undelivered admin OTP challenge.', cleanupError);
+    }
     throw error;
   }
   return challengeId;

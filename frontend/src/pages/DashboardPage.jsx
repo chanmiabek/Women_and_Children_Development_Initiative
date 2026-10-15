@@ -320,7 +320,7 @@ function AdminLogin({ navigate, onLogin }) {
         <button disabled={loading} className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">{loading ? (challenge ? 'Verifying...' : 'Sending code...') : (challenge ? 'Verify code' : 'Send sign-in code')}</button>
         {challenge && <button type="button" onClick={() => { setChallenge(null); setError(''); }} className="mt-3 w-full rounded-lg border py-3 font-semibold text-gray-700 hover:bg-gray-50">Request a new code</button>}
         <button type="button" onClick={() => navigate('/')} className="mt-3 w-full rounded-lg border py-3 font-semibold text-gray-700 hover:bg-gray-50">Back to Website</button>
-        <p className="mt-4 text-center text-xs text-gray-500">Admin access is verified by an email code. Keep SMTP and signing secrets in backend environment variables.</p>
+        <p className="mt-4 text-center text-xs text-gray-500">Admin access is verified by an email code.</p>
       </form>
     </main>
   );
