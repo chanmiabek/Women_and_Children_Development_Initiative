@@ -11,7 +11,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL` in the frontend to the public API origin. Set `CORS_ORIGIN` to the exact frontend origins, separated by commas. Production does not allow wildcard CORS origins.
+Set `VITE_API_BASE_URL` in the frontend to the public API origin. In Render, set `CORS_ORIGIN` to the exact frontend origins, separated by commas. Include `https://womenchildrendevelopmentinitiative.org`, `https://www.womenchildrendevelopmentinitiative.org`, and `https://women-and-children-development-initiative-94wo1bs0c.vercel.app`, plus any other origins you still use. Append these to the existing Render value so other deployments remain allowed. After changing it, redeploy/restart the backend. Production does not allow wildcard CORS origins.
 
 ## Admin sign-in
 
